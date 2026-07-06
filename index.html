@@ -59,15 +59,13 @@
         let userImage = null;
         const templateURL = 'inventory.png'; 
 
-        // Función para cargar la plantilla con manejo de errores
         fabric.Image.fromURL(templateURL, function(img) {
             img.set({ selectable: false, evented: false });
             canvas.add(img);
-            img.bringToFront();
+            img.sendToBack();
             canvas.renderAll();
         }, { 
-            crossOrigin: 'anonymous',
-            onError: function() { console.error("Error al cargar la plantilla inventory.png. Verifica la ruta."); }
+            crossOrigin: 'anonymous'
         });
 
         document.getElementById('fileInput').addEventListener('change', function(e) {
@@ -81,7 +79,6 @@
                         userImage.scaleToHeight(512);
                         userImage.center();
                         canvas.add(userImage);
-                        userImage.sendToBack(); 
                         canvas.renderAll();
                     });
                 }
