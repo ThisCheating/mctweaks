@@ -30,7 +30,6 @@
         canvas { border: 2px solid #eee; border-radius: 8px; background: #fff; }
         .controls-box { width: 300px; display: flex; flex-direction: column; gap: 20px; }
         .upload-btn, button#downloadBtn { background: #6c63ff; color: white; padding: 12px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; width: 100%; }
-        .toggle-group { display: flex; align-items: center; gap: 10px; color: #555; }
     </style>
 </head>
 <body>
@@ -40,15 +39,15 @@
             <canvas id="c" width="512" height="512"></canvas>
         </div>
 
-        <div class="card controls-box">
-            <h1>MCTweaks.club</h1>
-            <input type="file" id="fileInput" accept="image/*" class="upload-btn">
-            
-            <div class="toggle-group">
-                <input type="checkbox" id="clipToggle">
-                <label for="clipToggle">Activar Modo Recorte</label>
+        <div class="controls-box">
+            <div class="card">
+                <h1>MCTweaks.club</h1>
+                <input type="file" id="fileInput" accept="image/*" class="upload-btn">
+                <div style="margin-top: 15px;">
+                    <label>Escala:</label>
+                    <input type="range" id="zoomSlider" min="0.1" max="3" step="0.01" value="1" style="width: 100%;">
+                </div>
             </div>
-
             <button id="downloadBtn">Descargar Overlay (.png)</button>
         </div>
     </div>
@@ -58,45 +57,47 @@
         let userImage = null;
         let template = null;
 
+        // Carga inicial del template
         fabric.Image.fromURL('inventory.png', function(img) {
             template = img;
-            template.set({ selectable: false, evented: false, crossOrigin: 'anonymous' });
+            template.set({ 
+                selectable: false, 
+                evented: false, 
+                crossOrigin: 'anonymous',
+                left: 0, top: 0 
+            });
             canvas.add(template);
+            template.bringToFront();
             canvas.requestRenderAll();
         }, { crossOrigin: 'anonymous' });
 
+        // Carga de imagen de usuario
         document.getElementById('fileInput').addEventListener('change', function(e) {
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                fabric.Image.fromURL(event.target.result, function(img) {
-                    if (userImage) canvas.remove(userImage);
-                    userImage = img;
-                    userImage.scaleToWidth(512);
-                    userImage.center();
-                    canvas.add(userImage);
-                    updateClip(); // Aplicar lógica de recorte al cargar
-                    canvas.requestRenderAll();
-                });
+            if (e.target.files && e.target.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    fabric.Image.fromURL(event.target.result, function(img) {
+                        if (userImage) canvas.remove(userImage);
+                        userImage = img;
+                        userImage.scaleToWidth(512);
+                        userImage.center();
+                        canvas.add(userImage);
+                        userImage.sendToBack(); 
+                        if(template) template.bringToFront();
+                        canvas.requestRenderAll();
+                    });
+                }
+                reader.readAsDataURL(e.target.files[0]);
             }
-            reader.readAsDataURL(e.target.files[0]);
         });
 
-        function updateClip() {
-            if (!userImage) return;
-            const isChecked = document.getElementById('clipToggle').checked;
-            
-            if (isChecked) {
-                // Usamos el template como máscara
-                userImage.clipPath = new fabric.Image(template.getElement(), {
-                    originX: 'center', originY: 'center'
-                });
-            } else {
-                userImage.clipPath = null;
+        document.getElementById('zoomSlider').addEventListener('input', function(e) {
+            if (userImage) {
+                userImage.scale(parseFloat(e.target.value));
+                userImage.center();
+                canvas.requestRenderAll();
             }
-            canvas.requestRenderAll();
-        }
-
-        document.getElementById('clipToggle').addEventListener('change', updateClip);
+        });
 
         document.getElementById('downloadBtn').addEventListener('click', function() {
             canvas.discardActiveObject();
@@ -108,5 +109,4 @@
         });
     </script>
 </body>
-</html>
 </html>
