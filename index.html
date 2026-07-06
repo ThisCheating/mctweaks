@@ -19,18 +19,19 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>MCTweaks.club | Generador Pro</title>
+    <title>MCTweaks.club | Generador Profesional</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; display: flex; justify-content: center; padding: 20px; }
         .app-wrapper { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
         .card { background: #ffffff; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .controls { width: 350px; display: flex; flex-direction: column; gap: 10px; }
+        .controls { width: 380px; display: flex; flex-direction: column; gap: 12px; }
         canvas { border: 2px dashed #ccc; border-radius: 8px; }
-        .color-btn { border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px; font-weight: bold; color: white; }
-        textarea { width: 100%; padding: 8px; font-family: monospace; }
+        .color-palette { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 10px; }
+        .color-btn { border: none; padding: 5px; cursor: pointer; border-radius: 3px; font-size: 10px; font-weight: bold; color: #fff; }
         .upload-btn { background: #6c63ff; color: white; padding: 10px; border-radius: 6px; border: none; cursor: pointer; width: 100%; }
+        #soundList { height: 120px; overflow-y: auto; border: 1px solid #ddd; padding: 5px; font-size: 11px; }
     </style>
 </head>
 <body>
@@ -43,42 +44,63 @@
     <div class="card controls">
         <h1>MCTweaks.club</h1>
         
-        <label>Descripción con colores:</label>
-        <div id="colorPicker" style="margin-bottom: 5px;">
-            <button class="color-btn" style="background:#f1c40f" onclick="insertColor('§e')">Amarillo</button>
-            <button class="color-btn" style="background:#e74c3c" onclick="insertColor('§c')">Rojo</button>
-            <button class="color-btn" style="background:#2ecc71" onclick="insertColor('§a')">Verde</button>
-            <button class="color-btn" style="background:#3498db" onclick="insertColor('§b')">Azul</button>
-        </div>
-        <textarea id="descInput" rows="3">§ePack de §aMCTweaks.club</textarea>
+        <label>Logo del Pack:</label>
+        <input type="file" id="logoInput" accept="image/*">
+        
+        <label>Versión:</label>
+        <select id="versionSelect">
+            <option value="48">1.21.4</option>
+            <option value="34">1.21.1</option>
+            <option value="15">1.20.x</option>
+            <option value="8">1.16.x</option>
+            <option value="1">1.8.9</option>
+        </select>
 
-        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Añadir imagen</button>
+        <label>Descripción con colores:</label>
+        <div class="color-palette" id="palette"></div>
+        <textarea id="descInput" rows="2">§ePack de §aMCTweaks.club</textarea>
+
+        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">+ Añadir imagen al fondo</button>
         <input type="file" id="fileInput" accept="image/*" style="display:none">
         
         <label>Mixer de Sonidos (.zip):</label>
         <input type="file" id="soundInput" accept=".zip">
-        <div id="soundList" style="height: 100px; overflow-y: auto; border: 1px solid #ddd;"></div>
+        <div id="soundList"></div>
 
         <button id="downloadBtn" class="upload-btn" style="background:#2ecc71">Generar Texture Pack (.zip)</button>
     </div>
 </div>
 
 <script>
-    // Función para insertar el código de color en el cursor
+    // 1. Paleta de colores Minecraft
+    const colors = [
+        {c:'§0', b:'#000000', n:'Negro'}, {c:'§1', b:'#0000AA', n:'Azul'}, {c:'§2', b:'#00AA00', n:'Verde'}, {c:'§3', b:'#00AAAA', n:'Aqua'},
+        {c:'§4', b:'#AA0000', n:'Rojo'}, {c:'§5', b:'#AA00AA', n:'Morado'}, {c:'§6', b:'#FFAA00', n:'Dorado'}, {c:'§7', b:'#AAAAAA', n:'Gris'},
+        {c:'§8', b:'#555555', n:'Gris Osc'}, {c:'§9', b:'#5555FF', n:'Azul C'}, {c:'§a', b:'#55FF55', n:'Verde C'}, {c:'§b', b:'#55FFFF', n:'Aqua C'},
+        {c:'§c', b:'#FF5555', n:'Rojo C'}, {c:'§d', b:'#FF55FF', n:'Rosa'}, {c:'§e', b:'#FFFF55', n:'Amarillo'}, {c:'§f', b:'#FFFFFF', n:'Blanco'}
+    ];
+    
+    const palette = document.getElementById('palette');
+    colors.forEach(col => {
+        const b = document.createElement('button');
+        b.className = 'color-btn';
+        b.style.backgroundColor = col.b;
+        b.innerText = col.n;
+        b.onclick = () => insertColor(col.c);
+        palette.appendChild(b);
+    });
+
     function insertColor(code) {
-        const textarea = document.getElementById('descInput');
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const text = textarea.value;
-        textarea.value = text.substring(0, start) + code + text.substring(end);
-        textarea.focus();
+        const t = document.getElementById('descInput');
+        t.value = t.value.substring(0, t.selectionStart) + code + t.value.substring(t.selectionEnd);
+        t.focus();
     }
 
+    // 2. Configuración Canvas
     const canvas = new fabric.Canvas('c');
     let template = null;
     let selectedSounds = new Map();
 
-    // Template
     fabric.Image.fromURL('inventory.png', (img) => {
         template = img;
         template.set({ selectable: false, evented: false, originX: 'center', originY: 'center', left: 256, top: 256 });
@@ -86,7 +108,6 @@
         template.bringToFront();
     }, { crossOrigin: 'anonymous' });
 
-    // Añadir imágenes
     document.getElementById('fileInput').addEventListener('change', (e) => {
         const reader = new FileReader();
         reader.onload = (ev) => {
@@ -102,7 +123,7 @@
         reader.readAsDataURL(e.target.files[0]);
     });
 
-    // Mixer de sonidos
+    // 3. Procesar Sonidos
     document.getElementById('soundInput').addEventListener('change', async (e) => {
         const zip = await JSZip.loadAsync(e.target.files[0]);
         const list = document.getElementById('soundList');
@@ -117,31 +138,30 @@
                 };
                 const btn = document.createElement('button');
                 btn.innerText = "▶ " + path.split('/').pop();
-                btn.onclick = () => new Audio(URL.createObjectURL(new Blob([/*data*/]))).play(); // simplified for brevity
+                btn.onclick = async () => new Audio(URL.createObjectURL(await entry.async("blob"))).play();
                 div.append(chk, btn);
                 list.appendChild(div);
             }
         });
     });
 
-    // Generar ZIP Final
+    // 4. Generar Zip
     document.getElementById('downloadBtn').addEventListener('click', async () => {
         const zip = new JSZip();
-        // Exportar Canvas
         const canvasData = canvas.toDataURL({format: 'png'}).split(',')[1];
         zip.folder("assets/minecraft/textures/gui/container").file("inventory.png", canvasData, {base64: true});
 
-        // Sonidos
+        if (document.getElementById('logoInput').files[0]) {
+            const logo = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result.split(',')[1]); fr.readAsDataURL(document.getElementById('logoInput').files[0]); });
+            zip.file("pack.png", logo, {base64: true});
+        }
+
         for (let [path, blob] of selectedSounds) {
             zip.file(`assets/minecraft/sounds/${path.split('/').pop()}`, blob);
         }
 
-        // Metadatos con colores
         zip.file("pack.mcmeta", JSON.stringify({
-            pack: { 
-                pack_format: 34, 
-                description: document.getElementById('descInput').value 
-            }
+            pack: { pack_format: parseInt(document.getElementById('versionSelect').value), description: document.getElementById('descInput').value }
         }, null, 2));
 
         const content = await zip.generateAsync({type: "blob"});
