@@ -20,45 +20,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MCTweaks.club | Generador</title>
+    <title>MCTweaks.club | Generator</title>
+    <!-- Usamos una versión estable de Fabric.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        body { font-family: sans-serif; background: #f4f4f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
         .app-wrapper { display: flex; gap: 20px; align-items: flex-start; }
-        
-        .card { background: #ffffff; padding: 25px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); border: 1px solid #eee; }
-        
-        .canvas-box { text-align: center; }
-        canvas { border: 2px solid #eee; border-radius: 8px; background: #fff; }
-        
+        .card { background: #ffffff; padding: 25px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); }
+        .canvas-container { border: 2px solid #ddd; border-radius: 8px; background: #fff; }
         .controls-box { width: 300px; display: flex; flex-direction: column; gap: 20px; }
-        .controls-box h1 { color: #6c63ff; font-size: 24px; margin: 0 0 10px 0; }
-        
-        .upload-btn { background: #6c63ff; color: white; padding: 12px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; width: 100%; }
-        .slider-group { display: flex; flex-direction: column; gap: 8px; color: #555; }
-        button#downloadBtn { padding: 12px; cursor: pointer; background: #6c63ff; color: white; border: none; border-radius: 8px; font-weight: bold; transition: 0.3s; }
-        button#downloadBtn:hover { background: #5a52d5; }
+        .upload-btn { background: #6c63ff; color: white; padding: 12px; border-radius: 8px; border: none; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <div class="app-wrapper">
-        <!-- Columna Izquierda: Canvas -->
-        <div class="card canvas-box">
+        <div class="card">
             <canvas id="c" width="512" height="512"></canvas>
         </div>
 
-        <!-- Columna Derecha: Controles -->
         <div class="card controls-box">
             <h1>MCTweaks.club</h1>
             <input type="file" id="fileInput" accept="image/*" class="upload-btn">
-            
-            <div class="slider-group">
-                <label>Escala de imagen:</label>
-                <input type="range" id="zoomSlider" min="0.1" max="3" step="0.01" value="1">
-            </div>
-
-            <button id="downloadBtn">Descargar Overlay (.png)</button>
+            <input type="range" id="zoomSlider" min="0.1" max="3" step="0.01" value="1">
+            <button id="downloadBtn" class="upload-btn">Descargar</button>
         </div>
     </div>
 
@@ -66,33 +51,33 @@
         const canvas = new fabric.Canvas('c');
         let userImage = null;
         let template = null;
-        const templateURL = 'inventory.png'; 
 
-        fabric.Image.fromURL(templateURL, function(img) {
-            template = img;
-            template.set({ selectable: false, evented: false });
-            canvas.add(template);
-            template.bringToFront();
-            canvas.renderAll();
-        }, { crossOrigin: 'anonymous' });
+        // IMPORTANTE: Definimos la carga del template con un parámetro de CORS
+        function loadTemplate() {
+            fabric.Image.fromURL('inventory.png', function(img) {
+                template = img;
+                template.set({ selectable: false, evented: false, crossOrigin: 'anonymous' });
+                canvas.add(template);
+                template.bringToFront();
+                canvas.renderAll();
+            });
+        }
 
         document.getElementById('fileInput').addEventListener('change', function(e) {
-            if (e.target.files && e.target.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    fabric.Image.fromURL(event.target.result, function(img) {
-                        if (userImage) canvas.remove(userImage);
-                        userImage = img;
-                        userImage.scaleToWidth(512);
-                        userImage.center();
-                        canvas.add(userImage);
-                        userImage.sendToBack(); 
-                        if(template) template.bringToFront();
-                        canvas.renderAll();
-                    });
-                }
-                reader.readAsDataURL(e.target.files[0]);
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                fabric.Image.fromURL(event.target.result, function(img) {
+                    if (userImage) canvas.remove(userImage);
+                    userImage = img;
+                    userImage.scaleToWidth(512);
+                    userImage.center();
+                    canvas.add(userImage);
+                    userImage.sendToBack(); 
+                    if(template) template.bringToFront();
+                    canvas.renderAll();
+                });
             }
+            reader.readAsDataURL(e.target.files[0]);
         });
 
         document.getElementById('zoomSlider').addEventListener('input', function(e) {
@@ -104,12 +89,15 @@
         });
 
         document.getElementById('downloadBtn').addEventListener('click', function() {
-            const dataURL = canvas.toDataURL({ format: 'png', multiplier: 2 });
+            const dataURL = canvas.toDataURL({ format: 'png', multiplier: 1 });
             const link = document.createElement('a');
-            link.download = 'mctweaks_overlay.png';
+            link.download = 'overlay.png';
             link.href = dataURL;
             link.click();
         });
+
+        // Inicializar
+        loadTemplate();
     </script>
 </body>
 </html>
