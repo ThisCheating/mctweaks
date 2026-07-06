@@ -21,7 +21,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MCTweaks.club | Generator</title>
-    <!-- Usamos una versión estable de Fabric.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <style>
         body { font-family: sans-serif; background: #f4f4f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
@@ -36,7 +35,7 @@
 
     <div class="app-wrapper">
         <div class="card">
-            <canvas id="c" width="512" height="512"></canvas>
+            <canvas id="c" width="512" height="512" style="border:1px solid #ccc"></canvas>
         </div>
 
         <div class="card controls-box">
@@ -52,14 +51,22 @@
         let userImage = null;
         let template = null;
 
-        // IMPORTANTE: Definimos la carga del template con un parámetro de CORS
-        function loadTemplate() {
+        function initCanvas() {
+            // Cargar el template
             fabric.Image.fromURL('inventory.png', function(img) {
                 template = img;
-                template.set({ selectable: false, evented: false, crossOrigin: 'anonymous' });
+                template.set({ 
+                    selectable: false, 
+                    evented: false, 
+                    crossOrigin: 'anonymous',
+                    originX: 'center', 
+                    originY: 'center',
+                    left: 256, 
+                    top: 256 
+                });
                 canvas.add(template);
                 template.bringToFront();
-                canvas.renderAll();
+                canvas.requestRenderAll(); // Forzar renderizado
             });
         }
 
@@ -69,12 +76,17 @@
                 fabric.Image.fromURL(event.target.result, function(img) {
                     if (userImage) canvas.remove(userImage);
                     userImage = img;
+                    userImage.set({
+                        originX: 'center',
+                        originY: 'center',
+                        left: 256,
+                        top: 256
+                    });
                     userImage.scaleToWidth(512);
-                    userImage.center();
                     canvas.add(userImage);
                     userImage.sendToBack(); 
                     if(template) template.bringToFront();
-                    canvas.renderAll();
+                    canvas.requestRenderAll(); // Forzar renderizado
                 });
             }
             reader.readAsDataURL(e.target.files[0]);
@@ -83,12 +95,12 @@
         document.getElementById('zoomSlider').addEventListener('input', function(e) {
             if (userImage) {
                 userImage.scale(parseFloat(e.target.value));
-                userImage.center();
-                canvas.renderAll();
+                canvas.requestRenderAll(); // Forzar renderizado
             }
         });
 
         document.getElementById('downloadBtn').addEventListener('click', function() {
+            canvas.requestRenderAll();
             const dataURL = canvas.toDataURL({ format: 'png', multiplier: 1 });
             const link = document.createElement('a');
             link.download = 'overlay.png';
@@ -96,8 +108,7 @@
             link.click();
         });
 
-        // Inicializar
-        loadTemplate();
+        initCanvas();
     </script>
 </body>
 </html>
