@@ -19,14 +19,12 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MCTweaks.club | Generator</title>
+    <title>MCTweaks.club | Multi-Image Generator</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <style>
         body { font-family: sans-serif; background: #f4f4f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
         .app-wrapper { display: flex; gap: 20px; align-items: flex-start; }
         .card { background: #ffffff; padding: 25px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); }
-        .canvas-container { border: 2px solid #ddd; border-radius: 8px; background: #fff; }
         .controls-box { width: 300px; display: flex; flex-direction: column; gap: 20px; }
         .upload-btn { background: #6c63ff; color: white; padding: 12px; border-radius: 8px; border: none; cursor: pointer; }
     </style>
@@ -41,85 +39,61 @@
         <div class="card controls-box">
             <h1>MCTweaks.club</h1>
             <input type="file" id="fileInput" accept="image/*" class="upload-btn">
-            
-            <label><input type="checkbox" id="clipToggle"> Activar Modo Recorte</label>
-            
+            <p style="font-size: 12px; color: #666;">Puedes subir varias imágenes. Selecciónalas para moverlas o usar el slider para escalar la seleccionada.</p>
             <input type="range" id="zoomSlider" min="0.1" max="3" step="0.01" value="1">
-            <button id="downloadBtn" class="upload-btn">Descargar</button>
+            <button id="downloadBtn" class="upload-btn">Descargar Resultado</button>
         </div>
     </div>
 
     <script>
         const canvas = new fabric.Canvas('c');
-        let userImage = null;
         let template = null;
 
-        function initCanvas() {
-            fabric.Image.fromURL('inventory.png', function(img) {
-                template = img;
-                template.set({ 
-                    selectable: false, evented: false, crossOrigin: 'anonymous',
-                    originX: 'center', originY: 'center', left: 256, top: 256 
-                });
-                canvas.add(template);
-                template.bringToFront();
-                canvas.requestRenderAll();
-            });
-        }
-
-        function updateClip() {
-            if (!userImage) return;
-            const isChecked = document.getElementById('clipToggle').checked;
-            
-            if (isChecked && template) {
-                // Se usa el elemento del template como máscara de recorte
-                userImage.clipPath = new fabric.Image(template.getElement(), {
-                    originX: 'center', originY: 'center',
-                    left: 256, top: 256,
-                    scaleX: template.scaleX, scaleY: template.scaleY
-                });
-            } else {
-                userImage.clipPath = null;
-            }
+        // Carga el template
+        fabric.Image.fromURL('inventory.png', function(img) {
+            template = img;
+            template.set({ selectable: false, evented: false, crossOrigin: 'anonymous', originX: 'center', originY: 'center', left: 256, top: 256 });
+            canvas.add(template);
             canvas.requestRenderAll();
-        }
+        }, { crossOrigin: 'anonymous' });
 
-        document.getElementById('clipToggle').addEventListener('change', updateClip);
-
+        // Añadir múltiples imágenes
         document.getElementById('fileInput').addEventListener('change', function(e) {
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                fabric.Image.fromURL(event.target.result, function(img) {
-                    if (userImage) canvas.remove(userImage);
-                    userImage = img;
-                    userImage.set({ originX: 'center', originY: 'center', left: 256, top: 256 });
-                    userImage.scaleToWidth(512);
-                    canvas.add(userImage);
-                    userImage.sendToBack(); 
-                    if(template) template.bringToFront();
-                    updateClip(); // Aplicar si estaba marcado
-                    canvas.requestRenderAll();
-                });
+            if (e.target.files && e.target.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    fabric.Image.fromURL(event.target.result, function(img) {
+                        img.set({ originX: 'center', originY: 'center', left: 256, top: 256 });
+                        img.scaleToWidth(200); // Tamaño inicial más pequeño para que no ocupen todo
+                        canvas.add(img);
+                        
+                        // Mantenemos el template arriba
+                        if(template) template.bringToFront();
+                        canvas.setActiveObject(img);
+                        canvas.requestRenderAll();
+                    });
+                }
+                reader.readAsDataURL(e.target.files[0]);
             }
-            reader.readAsDataURL(e.target.files[0]);
         });
 
+        // El slider ahora afecta a la imagen seleccionada actualmente
         document.getElementById('zoomSlider').addEventListener('input', function(e) {
-            if (userImage) {
-                userImage.scale(parseFloat(e.target.value));
+            const activeObj = canvas.getActiveObject();
+            if (activeObj && activeObj !== template) {
+                activeObj.scale(parseFloat(e.target.value));
                 canvas.requestRenderAll();
             }
         });
 
         document.getElementById('downloadBtn').addEventListener('click', function() {
+            canvas.discardActiveObject();
             const dataURL = canvas.toDataURL({ format: 'png', multiplier: 2 });
             const link = document.createElement('a');
-            link.download = 'overlay_recortado.png';
+            link.download = 'mctweaks_multi_overlay.png';
             link.href = dataURL;
             link.click();
         });
-
-        initCanvas();
     </script>
 </body>
 </html>
