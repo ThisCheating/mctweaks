@@ -27,11 +27,12 @@
         body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; display: flex; justify-content: center; padding: 20px; }
         .app-wrapper { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
         .card { background: #ffffff; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .controls { width: 320px; display: flex; flex-direction: column; gap: 15px; }
-        canvas { border: 2px dashed #ccc; border-radius: 8px; }
+        .controls { width: 350px; display: flex; flex-direction: column; gap: 15px; }
+        canvas { border: 2px dashed #ccc; border-radius: 8px; cursor: crosshair; }
         .upload-btn { background: #6c63ff; color: white; padding: 10px; border-radius: 6px; border: none; cursor: pointer; width: 100%; font-weight: bold; }
         #soundList { max-height: 200px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 5px; font-size: 12px; }
         .sound-item { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
+        textarea, select, input { width: 100%; padding: 8px; box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -46,20 +47,21 @@
     <div class="card controls">
         <h1>MCTweaks.club</h1>
         
-        <label>Logo del Pack:</label>
+        <label>Logo del Pack (pack.png):</label>
         <input type="file" id="logoInput" accept="image/*">
         
         <label>Versión:</label>
         <select id="versionSelect">
             <option value="48">1.21.4</option>
             <option value="34">1.21.1</option>
+            <option value="15">1.20.x</option>
             <option value="1">1.8.9</option>
         </select>
 
         <label>Descripción:</label>
         <textarea id="descInput">Pack generado en MCTweaks.club</textarea>
 
-        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Añadir imagen al Canvas</button>
+        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Añadir imagen al fondo</button>
         <input type="file" id="fileInput" accept="image/*" style="display:none">
         
         <label>Mixer de Sonidos (.zip):</label>
@@ -72,24 +74,37 @@
 
 <script>
     const canvas = new fabric.Canvas('c');
-    let logoFile = null;
+    let template = null;
     let selectedSounds = new Map();
 
-    // 1. Cargar Template
+    // 1. Cargar Template (Siempre al frente)
     fabric.Image.fromURL('inventory.png', (img) => {
-        img.set({ selectable: false, evented: false, originX: 'center', originY: 'center', left: 256, top: 256 });
-        canvas.add(img);
+        template = img;
+        template.set({ 
+            selectable: false, 
+            evented: false, 
+            originX: 'center', 
+            originY: 'center', 
+            left: 256, 
+            top: 256 
+        });
+        canvas.add(template);
+        template.bringToFront(); 
         canvas.requestRenderAll();
     }, { crossOrigin: 'anonymous' });
 
-    // 2. Añadir Imágenes al Canvas
+    // 2. Añadir Imágenes al Canvas (Siempre al fondo)
     document.getElementById('fileInput').addEventListener('change', (e) => {
+        if (!e.target.files[0]) return;
         const reader = new FileReader();
         reader.onload = (ev) => {
             fabric.Image.fromURL(ev.target.result, (img) => {
                 img.set({ originX: 'center', originY: 'center', left: 256, top: 256 });
                 img.scaleToWidth(200);
                 canvas.add(img);
+                img.sendToBack(); // Envía la imagen al fondo
+                if (template) template.bringToFront(); // Asegura que el template tape todo
+                canvas.requestRenderAll();
             });
         };
         reader.readAsDataURL(e.target.files[0]);
@@ -127,7 +142,7 @@
         const canvasData = canvas.toDataURL({format: 'png'}).split(',')[1];
         zip.folder("assets/minecraft/textures/gui/container").file("inventory.png", canvasData, {base64: true});
 
-        // Logo
+        // Logo pack.png
         if (document.getElementById('logoInput').files[0]) {
             const logo = await new Promise(r => {
                 const fr = new FileReader();
@@ -137,14 +152,17 @@
             zip.file("pack.png", logo, {base64: true});
         }
 
-        // Sonidos seleccionados
+        // Sonidos
         for (let [path, blob] of selectedSounds) {
             zip.file(`assets/minecraft/sounds/${path.split('/').pop()}`, blob);
         }
 
         // Metadatos
         zip.file("pack.mcmeta", JSON.stringify({
-            pack: { pack_format: parseInt(document.getElementById('versionSelect').value), description: document.getElementById('descInput').value }
+            pack: { 
+                pack_format: parseInt(document.getElementById('versionSelect').value), 
+                description: document.getElementById('descInput').value 
+            }
         }, null, 2));
 
         const content = await zip.generateAsync({type: "blob"});
