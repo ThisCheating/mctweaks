@@ -19,45 +19,53 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>MCTweaks.club | Generator</title>
+    <title>MCTweaks.club | Generador Todo en Uno</title>
+    <!-- Librerías externas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #f4f4f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .app-wrapper { display: flex; gap: 20px; align-items: flex-start; }
-        .card { background: #ffffff; padding: 25px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); }
-        .controls-box { width: 350px; display: flex; flex-direction: column; gap: 15px; }
-        .upload-btn { background: #6c63ff; color: white; padding: 10px; border-radius: 8px; border: none; cursor: pointer; width: 100%; }
-        input, select, textarea { width: 100%; padding: 8px; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; display: flex; justify-content: center; padding: 20px; }
+        .app-wrapper { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+        .card { background: #ffffff; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .controls { width: 320px; display: flex; flex-direction: column; gap: 15px; }
+        canvas { border: 2px dashed #ccc; border-radius: 8px; }
+        .upload-btn { background: #6c63ff; color: white; padding: 10px; border-radius: 6px; border: none; cursor: pointer; width: 100%; font-weight: bold; }
+        #soundList { max-height: 200px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 5px; font-size: 12px; }
+        .sound-item { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
     </style>
 </head>
 <body>
 
 <div class="app-wrapper">
+    <!-- Canvas -->
     <div class="card">
-        <canvas id="c" width="512" height="512" style="border:1px solid #ccc"></canvas>
+        <canvas id="c" width="512" height="512"></canvas>
     </div>
 
-    <div class="card controls-box">
+    <!-- Controles -->
+    <div class="card controls">
         <h1>MCTweaks.club</h1>
         
-        <label>Logo del Pack (pack.png):</label>
+        <label>Logo del Pack:</label>
         <input type="file" id="logoInput" accept="image/*">
         
-        <label>Versión de Minecraft:</label>
+        <label>Versión:</label>
         <select id="versionSelect">
             <option value="48">1.21.4</option>
             <option value="34">1.21.1</option>
-            <option value="15">1.20.x</option>
-            <option value="8">1.16.x</option>
             <option value="1">1.8.9</option>
         </select>
 
         <label>Descripción:</label>
-        <textarea id="descInput" rows="2">Pack generado en MCTweaks.club</textarea>
+        <textarea id="descInput">Pack generado en MCTweaks.club</textarea>
 
-        <hr>
-        <input type="file" id="fileInput" accept="image/*" class="upload-btn" value="Añadir Elemento">
+        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Añadir imagen al Canvas</button>
+        <input type="file" id="fileInput" accept="image/*" style="display:none">
+        
+        <label>Mixer de Sonidos (.zip):</label>
+        <input type="file" id="soundInput" accept=".zip">
+        <div id="soundList"></div>
+
         <button id="downloadBtn" class="upload-btn" style="background:#2ecc71">Generar Texture Pack (.zip)</button>
     </div>
 </div>
@@ -65,17 +73,20 @@
 <script>
     const canvas = new fabric.Canvas('c');
     let logoFile = null;
+    let selectedSounds = new Map();
 
-    // Logo handler
-    document.getElementById('logoInput').addEventListener('change', (e) => {
-        logoFile = e.target.files[0];
-    });
+    // 1. Cargar Template
+    fabric.Image.fromURL('inventory.png', (img) => {
+        img.set({ selectable: false, evented: false, originX: 'center', originY: 'center', left: 256, top: 256 });
+        canvas.add(img);
+        canvas.requestRenderAll();
+    }, { crossOrigin: 'anonymous' });
 
-    // Añadir elementos al canvas
-    document.getElementById('fileInput').addEventListener('change', function(e) {
+    // 2. Añadir Imágenes al Canvas
+    document.getElementById('fileInput').addEventListener('change', (e) => {
         const reader = new FileReader();
-        reader.onload = (event) => {
-            fabric.Image.fromURL(event.target.result, (img) => {
+        reader.onload = (ev) => {
+            fabric.Image.fromURL(ev.target.result, (img) => {
                 img.set({ originX: 'center', originY: 'center', left: 256, top: 256 });
                 img.scaleToWidth(200);
                 canvas.add(img);
@@ -84,35 +95,59 @@
         reader.readAsDataURL(e.target.files[0]);
     });
 
-    // Generar ZIP
-    document.getElementById('downloadBtn').addEventListener('click', async function() {
+    // 3. Mixer de Sonidos
+    document.getElementById('soundInput').addEventListener('change', async (e) => {
+        const zip = await JSZip.loadAsync(e.target.files[0]);
+        const list = document.getElementById('soundList');
+        list.innerHTML = "";
+        
+        zip.forEach((path, entry) => {
+            if (path.endsWith('.ogg')) {
+                const div = document.createElement('div');
+                div.className = 'sound-item';
+                const chk = document.createElement('input'); chk.type = "checkbox";
+                chk.onchange = async (e) => {
+                    if(e.target.checked) selectedSounds.set(path, await entry.async("blob"));
+                    else selectedSounds.delete(path);
+                };
+                const btn = document.createElement('button');
+                btn.innerText = "▶ " + path.split('/').pop();
+                btn.onclick = async () => new Audio(URL.createObjectURL(await entry.async("blob"))).play();
+                div.append(chk, btn);
+                list.appendChild(div);
+            }
+        });
+    });
+
+    // 4. Generar ZIP Final
+    document.getElementById('downloadBtn').addEventListener('click', async () => {
         const zip = new JSZip();
         
-        // Canvas a imagen
-        const dataURL = canvas.toDataURL({ format: 'png' }).split(',')[1];
-        zip.folder("assets/minecraft/textures/gui/container").file("inventory.png", dataURL, { base64: true });
+        // Imagen del inventario
+        const canvasData = canvas.toDataURL({format: 'png'}).split(',')[1];
+        zip.folder("assets/minecraft/textures/gui/container").file("inventory.png", canvasData, {base64: true});
 
-        // Logo del pack (pack.png)
-        if (logoFile) {
-            const logoData = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result.split(',')[1]);
-                reader.readAsDataURL(logoFile);
+        // Logo
+        if (document.getElementById('logoInput').files[0]) {
+            const logo = await new Promise(r => {
+                const fr = new FileReader();
+                fr.onload = () => r(fr.result.split(',')[1]);
+                fr.readAsDataURL(document.getElementById('logoInput').files[0]);
             });
-            zip.file("pack.png", logoData, { base64: true });
+            zip.file("pack.png", logo, {base64: true});
         }
 
-        // pack.mcmeta
-        const mcmeta = {
-            "pack": {
-                "pack_format": parseInt(document.getElementById('versionSelect').value),
-                "description": document.getElementById('descInput').value
-            }
-        };
-        zip.file("pack.mcmeta", JSON.stringify(mcmeta, null, 2));
+        // Sonidos seleccionados
+        for (let [path, blob] of selectedSounds) {
+            zip.file(`assets/minecraft/sounds/${path.split('/').pop()}`, blob);
+        }
 
-        // Descargar
-        const content = await zip.generateAsync({ type: "blob" });
+        // Metadatos
+        zip.file("pack.mcmeta", JSON.stringify({
+            pack: { pack_format: parseInt(document.getElementById('versionSelect').value), description: document.getElementById('descInput').value }
+        }, null, 2));
+
+        const content = await zip.generateAsync({type: "blob"});
         const link = document.createElement('a');
         link.href = URL.createObjectURL(content);
         link.download = "MCTweaks_Pack.zip";
