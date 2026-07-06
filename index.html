@@ -19,116 +19,65 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MCTweaks.club | Generator</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        body { font-family: sans-serif; background: #f4f4f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
         .app-wrapper { display: flex; gap: 20px; align-items: flex-start; }
-        .card { background: #ffffff; padding: 25px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); border: 1px solid #eee; }
-        .canvas-box { text-align: center; }
-        canvas { border: 2px solid #eee; border-radius: 8px; background: #fff; cursor: crosshair; }
-        .controls-box { width: 300px; display: flex; flex-direction: column; gap: 20px; }
-        .upload-btn, button#downloadBtn { background: #6c63ff; color: white; padding: 12px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; width: 100%; }
-        .option-group { display: flex; align-items: center; gap: 10px; color: #555; font-size: 14px; margin-top: 10px; }
+        .card { background: #ffffff; padding: 25px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); }
+        canvas { border: 2px solid #ccc; background: #fff; }
     </style>
 </head>
 <body>
 
     <div class="app-wrapper">
-        <div class="card canvas-box">
-            <canvas id="c" width="512" height="512"></canvas>
+        <div class="card">
+            <!-- Forzamos un borde y fondo para ver el lienzo sí o sí -->
+            <canvas id="c" width="512" height="512" style="border: 2px dashed #6c63ff;"></canvas>
         </div>
 
-        <div class="controls-box">
-            <div class="card">
-                <h1>MCTweaks.club</h1>
-                <input type="file" id="fileInput" accept="image/*" class="upload-btn">
-                
-                <div style="margin-top: 15px;">
-                    <label>Escala:</label>
-                    <input type="range" id="zoomSlider" min="0.1" max="3" step="0.01" value="1" style="width: 100%;">
-                </div>
-
-                <div class="option-group">
-                    <input type="checkbox" id="clipToggle">
-                    <label for="clipToggle">Activar Modo Recorte</label>
-                </div>
-            </div>
-            <button id="downloadBtn">Descargar Overlay (.png)</button>
+        <div class="card">
+            <h1>MCTweaks.club</h1>
+            <input type="file" id="fileInput" accept="image/*">
+            <button id="downloadBtn">Descargar</button>
+            <p id="status" style="color:red; font-size: 12px;"></p>
         </div>
     </div>
 
     <script>
         const canvas = new fabric.Canvas('c');
-        let userImage = null;
-        let template = null;
+        const status = document.getElementById('status');
 
-        // Carga robusta del template
+        // Carga forzada con detección de errores
         fabric.Image.fromURL('inventory.png', function(img) {
-            template = img;
-            template.set({ 
-                selectable: false, evented: false, 
-                crossOrigin: 'anonymous', left: 0, top: 0 
-            });
-            canvas.add(template);
-            template.bringToFront();
-            canvas.requestRenderAll();
+            if (!img.getElement()) {
+                status.innerText = "Error: No se encontró 'inventory.png'. Revisa el nombre del archivo.";
+                return;
+            }
+            img.set({ selectable: false, evented: false });
+            canvas.add(img);
+            img.bringToFront();
+            canvas.renderAll();
         }, { crossOrigin: 'anonymous' });
 
-        // Función para aplicar/quitar recorte
-        function updateClip() {
-            if (!userImage) return;
-            const isChecked = document.getElementById('clipToggle').checked;
-            
-            if (isChecked && template) {
-                // El template actúa como máscara para la imagen
-                userImage.clipPath = new fabric.Image(template.getElement(), {
-                    originX: 'left', originY: 'top',
-                    scaleX: template.scaleX, scaleY: template.scaleY
-                });
-            } else {
-                userImage.clipPath = null;
-            }
-            canvas.requestRenderAll();
-        }
-
-        document.getElementById('clipToggle').addEventListener('change', updateClip);
-
         document.getElementById('fileInput').addEventListener('change', function(e) {
-            if (e.target.files && e.target.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    fabric.Image.fromURL(event.target.result, function(img) {
-                        if (userImage) canvas.remove(userImage);
-                        userImage = img;
-                        userImage.scaleToWidth(512);
-                        userImage.center();
-                        canvas.add(userImage);
-                        userImage.sendToBack(); 
-                        if(template) template.bringToFront();
-                        updateClip(); // Aplicar si el modo estaba activo
-                        canvas.requestRenderAll();
-                    });
-                }
-                reader.readAsDataURL(e.target.files[0]);
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                fabric.Image.fromURL(event.target.result, function(img) {
+                    img.scaleToWidth(512);
+                    img.center();
+                    canvas.add(img);
+                    img.sendToBack();
+                    canvas.renderAll();
+                });
             }
+            reader.readAsDataURL(e.target.files[0]);
         });
 
-        document.getElementById('zoomSlider').addEventListener('input', function(e) {
-            if (userImage) {
-                userImage.scale(parseFloat(e.target.value));
-                userImage.center();
-                updateClip(); // Mantener recorte al escalar
-                canvas.requestRenderAll();
-            }
-        });
-
-        document.getElementById('downloadBtn').addEventListener('click', function() {
-            canvas.discardActiveObject();
-            const dataURL = canvas.toDataURL({ format: 'png', multiplier: 2 });
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            const dataURL = canvas.toDataURL({ format: 'png' });
             const link = document.createElement('a');
-            link.download = 'mctweaks_overlay.png';
+            link.download = 'overlay.png';
             link.href = dataURL;
             link.click();
         });
