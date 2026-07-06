@@ -41,6 +41,9 @@
         <div class="card controls-box">
             <h1>MCTweaks.club</h1>
             <input type="file" id="fileInput" accept="image/*" class="upload-btn">
+            
+            <label><input type="checkbox" id="clipToggle"> Activar Modo Recorte</label>
+            
             <input type="range" id="zoomSlider" min="0.1" max="3" step="0.01" value="1">
             <button id="downloadBtn" class="upload-btn">Descargar</button>
         </div>
@@ -52,23 +55,36 @@
         let template = null;
 
         function initCanvas() {
-            // Cargar el template
             fabric.Image.fromURL('inventory.png', function(img) {
                 template = img;
                 template.set({ 
-                    selectable: false, 
-                    evented: false, 
-                    crossOrigin: 'anonymous',
-                    originX: 'center', 
-                    originY: 'center',
-                    left: 256, 
-                    top: 256 
+                    selectable: false, evented: false, crossOrigin: 'anonymous',
+                    originX: 'center', originY: 'center', left: 256, top: 256 
                 });
                 canvas.add(template);
                 template.bringToFront();
-                canvas.requestRenderAll(); // Forzar renderizado
+                canvas.requestRenderAll();
             });
         }
+
+        function updateClip() {
+            if (!userImage) return;
+            const isChecked = document.getElementById('clipToggle').checked;
+            
+            if (isChecked && template) {
+                // Se usa el elemento del template como máscara de recorte
+                userImage.clipPath = new fabric.Image(template.getElement(), {
+                    originX: 'center', originY: 'center',
+                    left: 256, top: 256,
+                    scaleX: template.scaleX, scaleY: template.scaleY
+                });
+            } else {
+                userImage.clipPath = null;
+            }
+            canvas.requestRenderAll();
+        }
+
+        document.getElementById('clipToggle').addEventListener('change', updateClip);
 
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const reader = new FileReader();
@@ -76,17 +92,13 @@
                 fabric.Image.fromURL(event.target.result, function(img) {
                     if (userImage) canvas.remove(userImage);
                     userImage = img;
-                    userImage.set({
-                        originX: 'center',
-                        originY: 'center',
-                        left: 256,
-                        top: 256
-                    });
+                    userImage.set({ originX: 'center', originY: 'center', left: 256, top: 256 });
                     userImage.scaleToWidth(512);
                     canvas.add(userImage);
                     userImage.sendToBack(); 
                     if(template) template.bringToFront();
-                    canvas.requestRenderAll(); // Forzar renderizado
+                    updateClip(); // Aplicar si estaba marcado
+                    canvas.requestRenderAll();
                 });
             }
             reader.readAsDataURL(e.target.files[0]);
@@ -95,15 +107,14 @@
         document.getElementById('zoomSlider').addEventListener('input', function(e) {
             if (userImage) {
                 userImage.scale(parseFloat(e.target.value));
-                canvas.requestRenderAll(); // Forzar renderizado
+                canvas.requestRenderAll();
             }
         });
 
         document.getElementById('downloadBtn').addEventListener('click', function() {
-            canvas.requestRenderAll();
-            const dataURL = canvas.toDataURL({ format: 'png', multiplier: 1 });
+            const dataURL = canvas.toDataURL({ format: 'png', multiplier: 2 });
             const link = document.createElement('a');
-            link.download = 'overlay.png';
+            link.download = 'overlay_recortado.png';
             link.href = dataURL;
             link.click();
         });
