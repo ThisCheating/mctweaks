@@ -16,183 +16,94 @@
 -->
 
 <!DOCTYPE html>
-
 <html lang="es">
-
 <head>
-
     <meta charset="UTF-8">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>MCTweaks.club | Inventory Overlay Generator</title>
-
-
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
-
     <style>
-
         :root { --primary: #007bff; --bg: #121212; --card: #1e1e1e; --text: #ffffff; }
-
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; margin: 0; padding: 20px; }
-
         .container { background: var(--card); padding: 20px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; }
-
-        canvas { border: 2px solid #333; border-radius: 8px; margin: 20px 0; background: #000; }
-
+        canvas { border: 2px solid #333; border-radius: 8px; margin: 20px 0; background: #222; }
         .controls { display: grid; gap: 15px; }
-
         .slider-group { display: flex; align-items: center; justify-content: center; gap: 10px; }
-
         button { padding: 12px 25px; cursor: pointer; background: var(--primary); color: white; border: none; border-radius: 6px; font-weight: bold; transition: 0.3s; }
-
         button:hover { background: #0056b3; }
-
-        .upload-btn { background: #444; padding: 10px; border-radius: 5px; }
-
+        .upload-btn { background: #444; padding: 10px; border-radius: 5px; color: white; }
     </style>
-
 </head>
-
 <body>
 
-
-
     <div class="container">
-
         <h1>MCTweaks.club</h1>
-
         <p>Generador de Overlays para Inventarios</p>
-
-
 
         <canvas id="c" width="512" height="512"></canvas>
 
-
-
         <div class="controls">
-
             <input type="file" id="fileInput" accept="image/*" class="upload-btn">
-
             
-
             <div class="slider-group">
-
                 <label>Zoom:</label>
-
                 <input type="range" id="zoomSlider" min="0.1" max="3" step="0.01" value="1">
-
             </div>
 
-
-
             <button id="downloadBtn">Descargar Overlay (.png)</button>
-
         </div>
-
     </div>
 
-
-
     <script>
-
-  
-
         const canvas = new fabric.Canvas('c');
-
         let userImage = null;
+        const templateURL = 'inventory.png'; 
 
-        const templateURL = 'inventory.png'; // Asegúrate de que este archivo esté en la raíz de tu repo
-
-
-
-        // Cargar la plantilla sobre el canvas
-
+        // Función para cargar la plantilla con manejo de errores
         fabric.Image.fromURL(templateURL, function(img) {
-
             img.set({ selectable: false, evented: false });
-
             canvas.add(img);
-
             img.bringToFront();
-
-        }, { crossOrigin: 'anonymous' });
-
-
-
-     
+            canvas.renderAll();
+        }, { 
+            crossOrigin: 'anonymous',
+            onError: function() { console.error("Error al cargar la plantilla inventory.png. Verifica la ruta."); }
+        });
 
         document.getElementById('fileInput').addEventListener('change', function(e) {
-
-            const reader = new FileReader();
-
-            reader.onload = function(event) {
-
-                fabric.Image.fromURL(event.target.result, function(img) {
-
-                    if (userImage) canvas.remove(userImage);
-
-                    userImage = img;
-
-                    userImage.scaleToWidth(512);
-
-                    userImage.scaleToHeight(512);
-
-                    userImage.center();
-
-                    canvas.add(userImage);
-
-                    userImage.sendToBack(); 
-
-                    canvas.renderAll();
-
-                });
-
+            if (e.target.files && e.target.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    fabric.Image.fromURL(event.target.result, function(img) {
+                        if (userImage) canvas.remove(userImage);
+                        userImage = img;
+                        userImage.scaleToWidth(512);
+                        userImage.scaleToHeight(512);
+                        userImage.center();
+                        canvas.add(userImage);
+                        userImage.sendToBack(); 
+                        canvas.renderAll();
+                    });
+                }
+                reader.readAsDataURL(e.target.files[0]);
             }
-
-            reader.readAsDataURL(e.target.files[0]);
-
         });
-
-
-
-     
 
         document.getElementById('zoomSlider').addEventListener('input', function(e) {
-
             if (userImage) {
-
                 userImage.scale(parseFloat(e.target.value));
-
                 userImage.center();
-
                 canvas.renderAll();
-
             }
-
         });
-
-
-
-
 
         document.getElementById('downloadBtn').addEventListener('click', function() {
-
             const dataURL = canvas.toDataURL({ format: 'png', multiplier: 1 });
-
             const link = document.createElement('a');
-
             link.download = 'inventory_overlay_mctweaks.png';
-
             link.href = dataURL;
-
             link.click();
-
         });
-
     </script>
-
 </body>
-
 </html>
