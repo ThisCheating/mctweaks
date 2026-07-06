@@ -19,81 +19,105 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>MCTweaks.club | Multi-Image Generator</title>
+    <title>MCTweaks.club | Generator</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         body { font-family: sans-serif; background: #f4f4f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
         .app-wrapper { display: flex; gap: 20px; align-items: flex-start; }
         .card { background: #ffffff; padding: 25px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); }
-        .controls-box { width: 300px; display: flex; flex-direction: column; gap: 20px; }
-        .upload-btn { background: #6c63ff; color: white; padding: 12px; border-radius: 8px; border: none; cursor: pointer; }
+        .controls-box { width: 350px; display: flex; flex-direction: column; gap: 15px; }
+        .upload-btn { background: #6c63ff; color: white; padding: 10px; border-radius: 8px; border: none; cursor: pointer; width: 100%; }
+        input, select, textarea { width: 100%; padding: 8px; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
-    <div class="app-wrapper">
-        <div class="card">
-            <canvas id="c" width="512" height="512" style="border:1px solid #ccc"></canvas>
-        </div>
-
-        <div class="card controls-box">
-            <h1>MCTweaks.club</h1>
-            <input type="file" id="fileInput" accept="image/*" class="upload-btn">
-            <p style="font-size: 12px; color: #666;">Puedes subir varias imágenes. Selecciónalas para moverlas o usar el slider para escalar la seleccionada.</p>
-            <input type="range" id="zoomSlider" min="0.1" max="3" step="0.01" value="1">
-            <button id="downloadBtn" class="upload-btn">Descargar Resultado</button>
-        </div>
+<div class="app-wrapper">
+    <div class="card">
+        <canvas id="c" width="512" height="512" style="border:1px solid #ccc"></canvas>
     </div>
 
-    <script>
-        const canvas = new fabric.Canvas('c');
-        let template = null;
+    <div class="card controls-box">
+        <h1>MCTweaks.club</h1>
+        
+        <label>Logo del Pack (pack.png):</label>
+        <input type="file" id="logoInput" accept="image/*">
+        
+        <label>Versión de Minecraft:</label>
+        <select id="versionSelect">
+            <option value="48">1.21.4</option>
+            <option value="34">1.21.1</option>
+            <option value="15">1.20.x</option>
+            <option value="8">1.16.x</option>
+            <option value="1">1.8.9</option>
+        </select>
 
-        // Carga el template
-        fabric.Image.fromURL('inventory.png', function(img) {
-            template = img;
-            template.set({ selectable: false, evented: false, crossOrigin: 'anonymous', originX: 'center', originY: 'center', left: 256, top: 256 });
-            canvas.add(template);
-            canvas.requestRenderAll();
-        }, { crossOrigin: 'anonymous' });
+        <label>Descripción:</label>
+        <textarea id="descInput" rows="2">Pack generado en MCTweaks.club</textarea>
 
-        // Añadir múltiples imágenes
-        document.getElementById('fileInput').addEventListener('change', function(e) {
-            if (e.target.files && e.target.files[0]) {
+        <hr>
+        <input type="file" id="fileInput" accept="image/*" class="upload-btn" value="Añadir Elemento">
+        <button id="downloadBtn" class="upload-btn" style="background:#2ecc71">Generar Texture Pack (.zip)</button>
+    </div>
+</div>
+
+<script>
+    const canvas = new fabric.Canvas('c');
+    let logoFile = null;
+
+    // Logo handler
+    document.getElementById('logoInput').addEventListener('change', (e) => {
+        logoFile = e.target.files[0];
+    });
+
+    // Añadir elementos al canvas
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            fabric.Image.fromURL(event.target.result, (img) => {
+                img.set({ originX: 'center', originY: 'center', left: 256, top: 256 });
+                img.scaleToWidth(200);
+                canvas.add(img);
+            });
+        };
+        reader.readAsDataURL(e.target.files[0]);
+    });
+
+    // Generar ZIP
+    document.getElementById('downloadBtn').addEventListener('click', async function() {
+        const zip = new JSZip();
+        
+        // Canvas a imagen
+        const dataURL = canvas.toDataURL({ format: 'png' }).split(',')[1];
+        zip.folder("assets/minecraft/textures/gui/container").file("inventory.png", dataURL, { base64: true });
+
+        // Logo del pack (pack.png)
+        if (logoFile) {
+            const logoData = await new Promise((resolve) => {
                 const reader = new FileReader();
-                reader.onload = function(event) {
-                    fabric.Image.fromURL(event.target.result, function(img) {
-                        img.set({ originX: 'center', originY: 'center', left: 256, top: 256 });
-                        img.scaleToWidth(200); // Tamaño inicial más pequeño para que no ocupen todo
-                        canvas.add(img);
-                        
-                        // Mantenemos el template arriba
-                        if(template) template.bringToFront();
-                        canvas.setActiveObject(img);
-                        canvas.requestRenderAll();
-                    });
-                }
-                reader.readAsDataURL(e.target.files[0]);
-            }
-        });
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.readAsDataURL(logoFile);
+            });
+            zip.file("pack.png", logoData, { base64: true });
+        }
 
-        // El slider ahora afecta a la imagen seleccionada actualmente
-        document.getElementById('zoomSlider').addEventListener('input', function(e) {
-            const activeObj = canvas.getActiveObject();
-            if (activeObj && activeObj !== template) {
-                activeObj.scale(parseFloat(e.target.value));
-                canvas.requestRenderAll();
+        // pack.mcmeta
+        const mcmeta = {
+            "pack": {
+                "pack_format": parseInt(document.getElementById('versionSelect').value),
+                "description": document.getElementById('descInput').value
             }
-        });
+        };
+        zip.file("pack.mcmeta", JSON.stringify(mcmeta, null, 2));
 
-        document.getElementById('downloadBtn').addEventListener('click', function() {
-            canvas.discardActiveObject();
-            const dataURL = canvas.toDataURL({ format: 'png', multiplier: 2 });
-            const link = document.createElement('a');
-            link.download = 'mctweaks_multi_overlay.png';
-            link.href = dataURL;
-            link.click();
-        });
-    </script>
+        // Descargar
+        const content = await zip.generateAsync({ type: "blob" });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(content);
+        link.download = "MCTweaks_Pack.zip";
+        link.click();
+    });
+</script>
 </body>
 </html>
