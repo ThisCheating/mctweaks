@@ -17,43 +17,43 @@
 
 
 
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MCTweaks.club | Clean Overlay Generator</title>
+    <title>MCTweaks.club | Overlay Generator</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; color: #333; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
-        .container { background: #ffffff; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); text-align: center; border: 1px solid #eee; }
-        h1 { color: #6c63ff; margin-bottom: 5px; }
-        p { color: #888; margin-bottom: 25px; }
-        canvas { border: 2px solid #ddd; border-radius: 8px; margin: 20px 0; background: #fff; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .controls { display: flex; flex-direction: column; gap: 20px; align-items: center; }
-        .upload-btn { background: #6c63ff; color: white; padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; }
-        .slider-group { display: flex; align-items: center; gap: 15px; color: #555; }
-        input[type="range"] { accent-color: #6c63ff; }
-        button#downloadBtn { padding: 12px 30px; cursor: pointer; background: #6c63ff; color: white; border: none; border-radius: 8px; font-weight: bold; transition: 0.3s; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; color: #333; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .main-wrapper { background: #ffffff; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); display: flex; gap: 40px; align-items: center; border: 1px solid #eee; }
+        .canvas-area { text-align: center; }
+        canvas { border: 2px solid #ddd; border-radius: 8px; background: #fff; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .controls { display: flex; flex-direction: column; gap: 20px; text-align: left; }
+        .controls h1 { color: #6c63ff; margin-top: 0; }
+        .upload-btn { background: #6c63ff; color: white; padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; width: 100%; }
+        .slider-group { display: flex; flex-direction: column; gap: 10px; color: #555; }
+        button#downloadBtn { padding: 15px; cursor: pointer; background: #6c63ff; color: white; border: none; border-radius: 8px; font-weight: bold; transition: 0.3s; }
         button#downloadBtn:hover { background: #5a52d5; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>MCTweaks.club</h1>
-        <p>Generador de Overlays para Inventarios</p>
-
-        <canvas id="c" width="512" height="512"></canvas>
+    <div class="main-wrapper">
+        <div class="canvas-area">
+            <canvas id="c" width="512" height="512"></canvas>
+        </div>
 
         <div class="controls">
+            <h1>MCTweaks.club</h1>
             <input type="file" id="fileInput" accept="image/*" class="upload-btn">
             
             <div class="slider-group">
-                <label>Escala:</label>
+                <label>Escala de imagen:</label>
                 <input type="range" id="zoomSlider" min="0.1" max="3" step="0.01" value="1">
             </div>
 
-            <button id="downloadBtn">Descargar Overlay (.png)</button>
+            <button id="downloadBtn">Descargar Overlay</button>
         </div>
     </div>
 
@@ -63,6 +63,7 @@
         let template = null;
         const templateURL = 'inventory.png'; 
 
+        // Cargar template siempre al frente
         fabric.Image.fromURL(templateURL, function(img) {
             template = img;
             template.set({ selectable: false, evented: false });
@@ -82,7 +83,7 @@
                         userImage.center();
                         canvas.add(userImage);
                         userImage.sendToBack(); 
-                        if(template) template.bringToFront();
+                        if(template) template.bringToFront(); // Refuerzo de capa
                         canvas.renderAll();
                     });
                 }
@@ -101,11 +102,10 @@
         document.getElementById('downloadBtn').addEventListener('click', function() {
             const dataURL = canvas.toDataURL({ format: 'png', multiplier: 2 });
             const link = document.createElement('a');
-            link.download = 'mi_overlay_blanco.png';
+            link.download = 'mctweaks_overlay.png';
             link.href = dataURL;
             link.click();
         });
     </script>
 </body>
-</html>
 </html>
