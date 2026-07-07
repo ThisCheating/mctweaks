@@ -19,87 +19,81 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>MCTweaks.club | Generador Pro</title>
+    <title>MCTweaks | Generador Pro</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #fff; padding: 20px; }
-        .app-wrapper { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; }
+        :root { --primary: #6c63ff; --dark: #121212; --light: #ffffff; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; margin: 0; }
+        
+        /* Header */
+        header { background: #1a1a1a; padding: 15px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); }
+        .nav-links a { color: #ccc; text-decoration: none; margin: 0 15px; font-weight: bold; transition: 0.3s; }
+        .nav-links a:hover { color: var(--primary); }
+
+        .app-wrapper { display: flex; gap: 40px; justify-content: center; padding: 40px; flex-wrap: wrap; }
         .scene { width: 512px; height: 512px; perspective: 1200px; }
         .card-3d { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.05s linear; }
-        .depth-layer { position: absolute; width: 100%; height: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); transform: translateZ(-40px); border-radius: 12px; opacity: 0; pointer-events: none; }
-        .card-3d.active .depth-layer { opacity: 1; }
-        #c { border-radius: 12px; cursor: grab; background: transparent; }
-        .controls { width: 350px; background: #fff; color: #333; padding: 20px; border-radius: 15px; }
-        .color-btn { border: none; height: 25px; cursor: pointer; border-radius: 3px; font-weight: bold; color: #000; margin: 2px; }
-        .upload-btn { background: #6c63ff; color: white; padding: 10px; border-radius: 6px; border: none; cursor: pointer; width: 100%; margin-top: 8px; }
+        
+        /* Controles mejorados */
+        .controls { width: 400px; background: #1a1a1a; padding: 25px; border-radius: 15px; border: 1px solid #333; }
+        .control-group { margin-bottom: 20px; }
+        label { display: block; font-size: 12px; color: #888; margin-bottom: 5px; text-transform: uppercase; }
+        input[type="file"] { width: 100%; padding: 10px; background: #222; border: 1px solid #444; color: white; border-radius: 5px; cursor: pointer; }
+        .btn-main { background: var(--primary); color: white; padding: 12px; border-radius: 6px; border: none; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
 <body>
 
+<header>
+    <h2 style="margin:0; color:var(--primary)">MCTweaks</h2>
+    <nav class="nav-links">
+        <a href="#">Tools</a><a href="#">Community</a><a href="#">Skins</a><a href="#">Renders</a>
+    </nav>
+</header>
+
 <div class="app-wrapper">
     <div class="scene">
         <div class="card-3d" id="card3d">
-            <div class="depth-layer"></div>
-            <canvas id="c" width="512" height="512"></canvas>
+            <div class="depth-layer" style="position:absolute; width:100%; height:100%; background:rgba(255,255,255,0.05); transform:translateZ(-40px); border-radius:12px; opacity:0; pointer-events:none;"></div>
+            <canvas id="c" width="512" height="512" style="background:#000; border-radius:12px;"></canvas>
         </div>
     </div>
 
     <div class="controls">
-        <h1>MCTweaks.club</h1>
-        <input type="text" id="packName" placeholder="Nombre del Pack" style="width:100%; margin-bottom:10px;">
-        <label>Descripción:</label>
-        <div id="palette"></div>
-        <textarea id="descInput" rows="2" style="width:100%">§ePack de §aMCTweaks.club</textarea>
-        
-        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">+ Subir Imagen</button>
-        <input type="file" id="fileInput" accept="image/*" style="display:none">
-        
-        <button id="readyBtn" class="upload-btn" style="background:#f39c12">Activar Modo 3D</button>
-        <button id="offBtn" class="upload-btn" style="background:#e74c3c; display:none">Desactivar 3D</button>
-        <button id="downloadBtn" class="upload-btn" style="background:#2ecc71">Generar .zip</button>
+        <div class="control-group">
+            <label>Descripción:</label>
+            <textarea id="descInput" rows="2" style="width:100%; background:#222; color:white; border:1px solid #444; border-radius:5px; padding:5px;">§ePack de §aMCTweaks.club</textarea>
+        </div>
+
+        <div class="control-group">
+            <label>Sonidos (.zip):</label>
+            <input type="file" id="soundInput" accept=".zip">
+        </div>
+
+        <div class="control-group">
+            <label>SkyOverlay Mixer (.zip):</label>
+            <input type="file" id="skyInput" accept=".zip">
+        </div>
+
+        <button id="readyBtn" class="btn-main">Activar Modo 3D</button>
+        <button id="offBtn" class="btn-main" style="background:#e74c3c; display:none;">Desactivar 3D</button>
+        <button id="downloadBtn" class="btn-main" style="background:#2ecc71;">Generar .zip</button>
     </div>
 </div>
 
 <script>
     const canvas = new fabric.Canvas('c');
-    canvas.selection = false;
     const card3d = document.getElementById('card3d');
-    let isDragging = false;
-    let templateObj = null;
-
-    // 1. Cargar Template y fijarlo al frente
+    
+    // Setup inicial
     fabric.Image.fromURL('inventory.png', (img) => {
-        templateObj = img.set({ selectable: false, evented: false, originX: 'center', originY: 'center', left: 256, top: 256 });
-        canvas.add(templateObj);
-        templateObj.bringToFront();
+        img.set({ selectable: false, evented: false, originX: 'center', originY: 'center', left: 256, top: 256 });
+        canvas.add(img);
     }, { crossOrigin: 'anonymous' });
 
-    // 2. Función maestra para añadir imagen correctamente
-    document.getElementById('fileInput').addEventListener('change', function(e) {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            fabric.Image.fromURL(event.target.result, function(img) {
-                img.set({ originX: 'center', originY: 'center', left: 256, top: 256 });
-                canvas.add(img);
-                img.sendToBack(); // La imagen siempre va al fondo
-                if(templateObj) templateObj.bringToFront(); // El template siempre encima
-                canvas.renderAll();
-            });
-        };
-        reader.readAsDataURL(e.target.files[0]);
-    });
-
-    // Colores
-    const colors = ['§0','§1','§2','§3','§4','§5','§6','§7'];
-    colors.forEach(c => {
-        const b = document.createElement('button');
-        b.className = 'color-btn'; b.innerText = 'A'; b.style.backgroundColor = '#ccc';
-        b.onclick = () => document.getElementById('descInput').value += c;
-        document.getElementById('palette').appendChild(b);
-    });
-
-    // 3D Logic Mejorada
+    // Lógica 3D
+    let isDragging = false;
     canvas.on('mouse:down', () => { if(card3d.classList.contains('active')) isDragging = true; });
     window.addEventListener('mouseup', () => isDragging = false);
     window.addEventListener('mousemove', (e) => {
@@ -110,28 +104,23 @@
     });
 
     document.getElementById('readyBtn').onclick = () => {
-        canvas.discardActiveObject();
-        canvas.forEachObject(o => o.selectable = false);
         card3d.classList.add('active');
-        document.getElementById('readyBtn').style.display = "none";
-        document.getElementById('offBtn').style.display = "block";
+        document.querySelector('.depth-layer').style.opacity = '1';
+        document.getElementById('readyBtn').style.display = 'none';
+        document.getElementById('offBtn').style.display = 'block';
     };
 
     document.getElementById('offBtn').onclick = () => {
-        canvas.forEachObject(o => o.selectable = true);
         card3d.classList.remove('active');
-        card3d.style.transform = `rotateY(0deg) rotateX(0deg)`;
-        document.getElementById('readyBtn').style.display = "block";
-        document.getElementById('offBtn').style.display = "none";
+        card3d.style.transform = 'rotateY(0deg) rotateX(0deg)';
+        document.querySelector('.depth-layer').style.opacity = '0';
+        document.getElementById('readyBtn').style.display = 'block';
+        document.getElementById('offBtn').style.display = 'none';
     };
 
-    document.getElementById('downloadBtn').onclick = async () => {
-        const zip = new JSZip();
-        // Exportamos el canvas completo
-        zip.folder("assets/minecraft/textures/gui/container").file("inventory.png", canvas.toDataURL().split(',')[1], {base64: true});
-        const content = await zip.generateAsync({type: "blob"});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(content); a.download = "MCTweaks.zip"; a.click();
-    };
+    // Placeholder para la lógica de los Mixers
+    document.getElementById('soundInput').onchange = () => console.log("Sound Mixer cargado");
+    document.getElementById('skyInput').onchange = () => console.log("Sky Mixer cargado");
 </script>
 </body>
 </html>
