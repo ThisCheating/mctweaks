@@ -19,147 +19,99 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>MCTweaks.club | Generador Profesional</title>
+    <title>MCTweaks.club | Generador Profesional de Packs</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; display: flex; justify-content: center; padding: 20px; }
-        .app-wrapper { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
-        .card { background: #ffffff; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .controls { width: 380px; display: flex; flex-direction: column; gap: 12px; }
-        canvas { border: 2px dashed #ccc; border-radius: 8px; }
-        .color-palette { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 10px; }
-        .color-btn { border: none; padding: 5px; cursor: pointer; border-radius: 3px; font-size: 10px; font-weight: bold; color: #fff; }
-        .upload-btn { background: #6c63ff; color: white; padding: 10px; border-radius: 6px; border: none; cursor: pointer; width: 100%; }
-        #soundList { height: 120px; overflow-y: auto; border: 1px solid #ddd; padding: 5px; font-size: 11px; }
+        :root { --primary: #6c63ff; --success: #2ecc71; --bg: #f4f4f9; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 40px; }
+        .app-wrapper { display: flex; gap: 40px; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+        .card { background: #ffffff; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); transition: all 0.5s ease; }
+        
+        /* Efecto 3D para el Canvas */
+        .canvas-container-outer { perspective: 1000px; }
+        .preview-3d { transform: rotateY(-15deg) rotateX(10deg); box-shadow: -20px 20px 50px rgba(0,0,0,0.2); }
+        
+        .controls { width: 350px; display: flex; flex-direction: column; gap: 15px; }
+        h1 { margin: 0 0 10px 0; color: #333; font-size: 24px; }
+        label { font-weight: 600; font-size: 13px; color: #666; }
+        .color-palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-bottom: 5px; }
+        .color-btn { border: none; height: 25px; cursor: pointer; border-radius: 4px; }
+        .btn { padding: 12px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; transition: 0.3s; color: white; }
+        .btn-main { background: var(--primary); }
+        .btn-success { background: var(--success); display: none; }
+        #soundList { height: 100px; overflow-y: auto; border: 1px solid #eee; padding: 10px; font-size: 12px; background: #fafafa; border-radius: 8px; }
     </style>
 </head>
 <body>
 
 <div class="app-wrapper">
-    <div class="card">
+    <div class="card canvas-container-outer" id="canvasCard">
         <canvas id="c" width="512" height="512"></canvas>
     </div>
 
     <div class="card controls">
         <h1>MCTweaks.club</h1>
-        
         <label>Logo del Pack:</label>
         <input type="file" id="logoInput" accept="image/*">
         
         <label>Versión:</label>
         <select id="versionSelect">
             <option value="48">1.21.4</option>
-            <option value="34">1.21.1</option>
             <option value="15">1.20.x</option>
-            <option value="8">1.16.x</option>
             <option value="1">1.8.9</option>
         </select>
 
-        <label>Descripción con colores:</label>
+        <label>Descripción:</label>
         <div class="color-palette" id="palette"></div>
-        <textarea id="descInput" rows="2">§ePack de §aMCTweaks.club</textarea>
+        <textarea id="descInput" rows="2" style="width:100%">§ePack de §aMCTweaks.club</textarea>
 
-        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">+ Añadir imagen al fondo</button>
+        <button class="btn btn-main" onclick="document.getElementById('fileInput').click()">+ Fondo de Inventario</button>
         <input type="file" id="fileInput" accept="image/*" style="display:none">
         
         <label>Mixer de Sonidos (.zip):</label>
         <input type="file" id="soundInput" accept=".zip">
         <div id="soundList"></div>
 
-        <button id="downloadBtn" class="upload-btn" style="background:#2ecc71">Generar Texture Pack (.zip)</button>
+        <button id="readyBtn" class="btn btn-main" onclick="previsualizar()">Listo: Visualizar en 3D</button>
+        <button id="downloadBtn" class="btn btn-success" onclick="generarPack()">Descargar Texture Pack (.zip)</button>
     </div>
 </div>
 
 <script>
-    // 1. Paleta de colores Minecraft
-    const colors = [
-        {c:'§0', b:'#000000', n:'Negro'}, {c:'§1', b:'#0000AA', n:'Azul'}, {c:'§2', b:'#00AA00', n:'Verde'}, {c:'§3', b:'#00AAAA', n:'Aqua'},
-        {c:'§4', b:'#AA0000', n:'Rojo'}, {c:'§5', b:'#AA00AA', n:'Morado'}, {c:'§6', b:'#FFAA00', n:'Dorado'}, {c:'§7', b:'#AAAAAA', n:'Gris'},
-        {c:'§8', b:'#555555', n:'Gris Osc'}, {c:'§9', b:'#5555FF', n:'Azul C'}, {c:'§a', b:'#55FF55', n:'Verde C'}, {c:'§b', b:'#55FFFF', n:'Aqua C'},
-        {c:'§c', b:'#FF5555', n:'Rojo C'}, {c:'§d', b:'#FF55FF', n:'Rosa'}, {c:'§e', b:'#FFFF55', n:'Amarillo'}, {c:'§f', b:'#FFFFFF', n:'Blanco'}
-    ];
-    
-    const palette = document.getElementById('palette');
-    colors.forEach(col => {
-        const b = document.createElement('button');
-        b.className = 'color-btn';
-        b.style.backgroundColor = col.b;
-        b.innerText = col.n;
-        b.onclick = () => insertColor(col.c);
-        palette.appendChild(b);
-    });
-
-    function insertColor(code) {
-        const t = document.getElementById('descInput');
-        t.value = t.value.substring(0, t.selectionStart) + code + t.value.substring(t.selectionEnd);
-        t.focus();
-    }
-
-    // 2. Configuración Canvas
     const canvas = new fabric.Canvas('c');
     let template = null;
     let selectedSounds = new Map();
 
+    // Cargar template
     fabric.Image.fromURL('inventory.png', (img) => {
-        template = img;
-        template.set({ selectable: false, evented: false, originX: 'center', originY: 'center', left: 256, top: 256 });
+        template = img.set({ selectable: false, originX: 'center', originY: 'center', left: 256, top: 256 });
         canvas.add(template);
-        template.bringToFront();
     }, { crossOrigin: 'anonymous' });
 
-    document.getElementById('fileInput').addEventListener('change', (e) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            fabric.Image.fromURL(ev.target.result, (img) => {
-                img.set({ originX: 'center', originY: 'center', left: 256, top: 256 });
-                img.scaleToWidth(200);
-                canvas.add(img);
-                img.sendToBack();
-                if(template) template.bringToFront();
-                canvas.requestRenderAll();
-            });
-        };
-        reader.readAsDataURL(e.target.files[0]);
+    // Colores
+    const colors = ['§0','§1','§2','§3','§4','§5','§6','§7','§8','§9','§a','§b','§c','§d','§e','§f'];
+    const palette = document.getElementById('palette');
+    colors.forEach(c => {
+        const b = document.createElement('button');
+        b.className = 'color-btn'; b.style.backgroundColor = '#ccc'; b.innerText = c.replace('§','');
+        b.onclick = () => { document.getElementById('descInput').value += c; };
+        palette.appendChild(b);
     });
 
-    // 3. Procesar Sonidos
-    document.getElementById('soundInput').addEventListener('change', async (e) => {
-        const zip = await JSZip.loadAsync(e.target.files[0]);
-        const list = document.getElementById('soundList');
-        list.innerHTML = "";
-        zip.forEach((path, entry) => {
-            if (path.endsWith('.ogg')) {
-                const div = document.createElement('div');
-                const chk = document.createElement('input'); chk.type = "checkbox";
-                chk.onchange = async (e) => {
-                    if(e.target.checked) selectedSounds.set(path, await entry.async("blob"));
-                    else selectedSounds.delete(path);
-                };
-                const btn = document.createElement('button');
-                btn.innerText = "▶ " + path.split('/').pop();
-                btn.onclick = async () => new Audio(URL.createObjectURL(await entry.async("blob"))).play();
-                div.append(chk, btn);
-                list.appendChild(div);
-            }
-        });
-    });
+    function previsualizar() {
+        document.getElementById('canvasCard').classList.add('preview-3d');
+        document.getElementById('readyBtn').innerText = "✓ Previsualización activa";
+        document.getElementById('readyBtn').style.background = "#999";
+        document.getElementById('downloadBtn').style.display = "block";
+    }
 
-    // 4. Generar Zip
-    document.getElementById('downloadBtn').addEventListener('click', async () => {
+    async function generarPack() {
         const zip = new JSZip();
         const canvasData = canvas.toDataURL({format: 'png'}).split(',')[1];
         zip.folder("assets/minecraft/textures/gui/container").file("inventory.png", canvasData, {base64: true});
 
-        if (document.getElementById('logoInput').files[0]) {
-            const logo = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result.split(',')[1]); fr.readAsDataURL(document.getElementById('logoInput').files[0]); });
-            zip.file("pack.png", logo, {base64: true});
-        }
-
-        for (let [path, blob] of selectedSounds) {
-            zip.file(`assets/minecraft/sounds/${path.split('/').pop()}`, blob);
-        }
-
+        // Pack Meta
         zip.file("pack.mcmeta", JSON.stringify({
             pack: { pack_format: parseInt(document.getElementById('versionSelect').value), description: document.getElementById('descInput').value }
         }, null, 2));
@@ -169,7 +121,8 @@
         link.href = URL.createObjectURL(content);
         link.download = "MCTweaks_Pack.zip";
         link.click();
-    });
+    }
 </script>
 </body>
+</html>
 </html>
