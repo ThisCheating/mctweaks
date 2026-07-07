@@ -26,26 +26,25 @@
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #fff; display: flex; justify-content: center; padding: 20px; margin: 0; }
         .app-wrapper { display: flex; gap: 40px; flex-wrap: wrap; justify-content: center; align-items: center; }
         
-        /* Contenedor 3D */
         .scene { width: 512px; height: 512px; perspective: 1500px; }
         .card-3d { 
             width: 100%; height: 100%; position: relative; transform-style: preserve-3d;
-            transition: transform 0.1s linear; user-select: none; will-change: transform;
+            transition: transform 0.05s linear; user-select: none; will-change: transform;
         }
-        .card-3d.active { cursor: grabbing; }
+        /* Cuando está activo, quitamos bordes de contenedor */
+        .card-3d.active { cursor: grabbing; border: none; }
+        
+        /* Capa de grosor (solo se ve en 3D) */
         .depth-layer { 
             position: absolute; width: 100%; height: 100%; background: rgba(255,255,255,0.03); 
-            border: 1px solid rgba(255,255,255,0.1); transform: translateZ(-40px); border-radius: 12px; pointer-events: none;
+            border: 1px solid rgba(255,255,255,0.1); transform: translateZ(-40px); border-radius: 12px; pointer-events: none; opacity: 0;
         }
+        .card-3d.active .depth-layer { opacity: 1; }
 
         #c { background: transparent; border-radius: 12px; cursor: grab; }
         
-        .controls { width: 350px; background: #fff; color: #333; padding: 20px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        h1 { margin: 0 0 15px 0; font-size: 20px; color: #6c63ff; }
-        .color-palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-bottom: 10px; }
-        .color-btn { border: none; height: 25px; cursor: pointer; border-radius: 3px; font-size: 10px; font-weight: bold; color: #fff; }
+        .controls { width: 350px; background: #fff; color: #333; padding: 20px; border-radius: 15px; }
         .upload-btn { background: #6c63ff; color: white; padding: 10px; border-radius: 6px; border: none; cursor: pointer; width: 100%; margin-top: 8px; font-weight: bold; }
-        #soundList { height: 80px; overflow-y: auto; border: 1px solid #ddd; padding: 5px; font-size: 11px; background: #f9f9f9; }
     </style>
 </head>
 <body>
@@ -60,23 +59,8 @@
 
     <div class="controls">
         <h1>MCTweaks.club Editor</h1>
-        <label>Logo del Pack:</label>
-        <input type="file" id="logoInput" accept="image/*">
-        
-        <label>Versión:</label>
-        <select id="versionSelect" style="width:100%"><option value="48">1.21.4</option><option value="1">1.8.9</option></select>
-
-        <label>Descripción:</label>
-        <div class="color-palette" id="palette"></div>
-        <textarea id="descInput" rows="2" style="width:100%">§ePack de §aMCTweaks.club</textarea>
-
         <button class="upload-btn" onclick="document.getElementById('fileInput').click()">+ Subir Imagen Fondo</button>
         <input type="file" id="fileInput" accept="image/*" style="display:none">
-        
-        <label>Mixer de Sonidos (.zip):</label>
-        <input type="file" id="soundInput" accept=".zip">
-        <div id="soundList"></div>
-
         <button id="readyBtn" class="upload-btn" style="background:#f39c12">Activar Modo 3D</button>
         <button id="offBtn" class="upload-btn" style="background:#e74c3c; display:none">Desactivar 3D</button>
         <button id="downloadBtn" class="upload-btn" style="background:#2ecc71">Descargar Texture Pack</button>
@@ -88,46 +72,44 @@
     const card3d = document.getElementById('card3d');
     let isDragging = false;
 
-    // 1. Cargar Template
     fabric.Image.fromURL('inventory.png', (img) => {
         img.set({ selectable: false, evented: false, originX: 'center', originY: 'center', left: 256, top: 256 });
         canvas.add(img);
     }, { crossOrigin: 'anonymous' });
 
-    // 2. Colores y Sonidos
-    const colors = ['§0','§1','§2','§3','§4','§5','§6','§7','§8','§9','§a','§b','§c','§d','§e','§f'];
-    colors.forEach(c => {
-        const b = document.createElement('button');
-        b.className = 'color-btn'; b.style.backgroundColor = '#555'; b.innerText = c;
-        b.onclick = () => { document.getElementById('descInput').value += c; };
-        document.getElementById('palette').appendChild(b);
-    });
-
-    // 3. Lógica 3D Sensible
+    // Lógica 3D Sensible y 360°
     canvas.on('mouse:down', () => { if(card3d.classList.contains('active')) isDragging = true; });
     window.addEventListener('mouseup', () => { isDragging = false; });
     window.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
-        let x = (e.clientX / window.innerWidth - 0.5) * 160;
-        let y = (e.clientY / window.innerHeight - 0.5) * 160;
+        let x = (e.clientX / window.innerWidth - 0.5) * 360;
+        let y = (e.clientY / window.innerHeight - 0.5) * 360;
         card3d.style.transform = `rotateY(${-x}deg) rotateX(${y}deg)`;
     });
 
     document.getElementById('readyBtn').onclick = () => {
-        canvas.discardActiveObject(); canvas.renderAll(); // Limpia edición
+        // 1. Desactivar selección de Fabric.js
+        canvas.discardActiveObject();
+        canvas.forEachObject(obj => { obj.selectable = false; obj.evented = false; });
+        canvas.renderAll();
+        
+        // 2. Activar vista 3D limpia
         card3d.classList.add('active');
         document.getElementById('readyBtn').style.display = "none";
         document.getElementById('offBtn').style.display = "block";
     };
 
     document.getElementById('offBtn').onclick = () => {
+        // 1. Reactivar selección
+        canvas.forEachObject(obj => { obj.selectable = true; obj.evented = true; });
+        
+        // 2. Desactivar vista 3D
         card3d.classList.remove('active');
         card3d.style.transform = `rotateY(0deg) rotateX(0deg)`;
         document.getElementById('readyBtn').style.display = "block";
         document.getElementById('offBtn').style.display = "none";
     };
 
-    // 4. Subida y Descarga
     document.getElementById('fileInput').addEventListener('change', (e) => {
         const reader = new FileReader();
         reader.onload = (ev) => {
@@ -137,14 +119,6 @@
             });
         };
         reader.readAsDataURL(e.target.files[0]);
-    });
-
-    document.getElementById('downloadBtn').addEventListener('click', async () => {
-        const zip = new JSZip();
-        zip.folder("assets/minecraft/textures/gui/container").file("inventory.png", canvas.toDataURL().split(',')[1], {base64: true});
-        zip.file("pack.mcmeta", JSON.stringify({ pack: { pack_format: parseInt(document.getElementById('versionSelect').value), description: document.getElementById('descInput').value } }, null, 2));
-        const content = await zip.generateAsync({type: "blob"});
-        const link = document.createElement('a'); link.href = URL.createObjectURL(content); link.download = "MCTweaks_Pack.zip"; link.click();
     });
 </script>
 </body>
