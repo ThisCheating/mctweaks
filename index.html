@@ -25,99 +25,76 @@
     <style>
         :root { --primary: #6c63ff; --dark: #1a1a1a; }
         body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; margin: 0; }
-        header { background: var(--dark); padding: 15px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); }
-        .app-wrapper { display: flex; gap: 40px; justify-content: center; padding: 20px; flex-wrap: wrap; }
-        
-        /* Contenedor 3D ajustado para asegurar visibilidad */
-        .scene { width: 512px; height: 512px; perspective: 1200px; position: relative; z-index: 10; }
-        .card-3d { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.05s linear; }
-        .depth-layer { position:absolute; width:100%; height:100%; background:rgba(255,255,255,0.05); transform:translateZ(-40px); border-radius:12px; opacity:0; pointer-events:none; }
-        .card-3d.active .depth-layer { opacity: 1; }
-        
-        /* Forzamos que el canvas sea visible */
-        #c { background: transparent; border-radius: 12px; cursor: grab; display: block; position: absolute; top:0; left:0; }
-        
+        .app-wrapper { display: flex; gap: 20px; justify-content: center; padding: 20px; flex-wrap: wrap; }
+        .scene { width: 512px; height: 512px; position: relative; }
+        #c { background: transparent; border: 1px solid #333; border-radius: 8px; }
         .controls { width: 400px; background: var(--dark); padding: 20px; border-radius: 15px; border: 1px solid #333; }
-        details { background: #222; margin-bottom: 10px; padding: 10px; border-radius: 5px; cursor: pointer; }
-        summary { font-weight: bold; font-size: 13px; color: var(--primary); }
-        .btn-main { background: var(--primary); color: white; padding: 10px; border: none; cursor: pointer; width: 100%; margin-top: 5px; border-radius: 5px; }
+        .file-list { max-height: 150px; overflow-y: auto; background: #000; padding: 10px; margin: 5px 0; font-size: 12px; }
+        .btn-main { background: var(--primary); color: white; padding: 10px; border: none; cursor: pointer; width: 100%; margin-top: 10px; border-radius: 5px; }
     </style>
 </head>
 <body>
 
-<header>
-    <h2 style="margin:0; color:var(--primary)">MCTweaks</h2>
-</header>
-
 <div class="app-wrapper">
     <div class="scene">
-        <div class="card-3d" id="card3d">
-            <div class="depth-layer"></div>
-            <canvas id="c" width="512" height="512"></canvas>
-        </div>
+        <canvas id="c" width="512" height="512"></canvas>
     </div>
 
     <div class="controls">
-        <label>Nombre Pack: <input type="text" id="packName" style="width:100%; background:#000; border:1px solid #444; color:white;"></label>
-        <div style="margin-top:10px;">
-            <label>Imagen Fondo:</label>
-            <input type="file" id="fileInput" accept="image/*">
-        </div>
-
+        <h3>Editor MCTweaks</h3>
+        <input type="text" id="packName" placeholder="Nombre del Pack" style="width:100%; padding:5px; margin-bottom:10px;">
+        
         <details>
-            <summary>Sound Mixer</summary>
-            <input type="file" id="soundInput" multiple>
+            <summary>Selector de Sonidos (ZIP)</summary>
+            <input type="file" id="soundInput" accept=".zip">
+            <div id="soundList" class="file-list"></div>
         </details>
 
-        <details>
-            <summary>SkyOverlay Mixer</summary>
-            <input type="file" id="skyInput" multiple>
-        </details>
-
-        <button id="readyBtn" class="btn-main">Activar Modo 3D</button>
-        <button id="offBtn" class="btn-main" style="background:#e74c3c; display:none;">Desactivar 3D</button>
-        <button id="downloadBtn" class="btn-main" style="background:#2ecc71;">Descargar .zip</button>
+        <button id="downloadBtn" class="btn-main" style="background:#2ecc71;">Descargar Pack Completo</button>
     </div>
 </div>
 
 <script>
-    // Inicialización del Canvas
     const canvas = new fabric.Canvas('c');
-    canvas.selection = false;
-    const card3d = document.getElementById('card3d');
+    let zipFiles = { sounds: {} };
 
-    // Cargar Template inicial obligatoriamente
-    fabric.Image.fromURL('inventory.png', (img) => {
-        img.set({ selectable: false, evented: false, originX: 'center', originY: 'center', left: 256, top: 256 });
-        canvas.add(img);
-        canvas.renderAll(); // Forzamos render
-    }, { crossOrigin: 'anonymous' });
-
-    // Cargar imagen de fondo
-    document.getElementById('fileInput').onchange = (e) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            fabric.Image.fromURL(ev.target.result, (img) => {
-                img.set({ originX: 'center', originY: 'center', left: 256, top: 256 });
-                canvas.add(img); img.sendToBack(); canvas.renderAll();
-            });
-        };
-        reader.readAsDataURL(e.target.files[0]);
+    // Leer ZIP y mostrar archivos para seleccionar
+    document.getElementById('soundInput').onchange = async (e) => {
+        const file = e.target.files[0];
+        const zip = await JSZip.loadAsync(file);
+        const list = document.getElementById('soundList');
+        list.innerHTML = '';
+        
+        zip.forEach((relativePath, zipEntry) => {
+            if (!zipEntry.dir) {
+                const label = document.createElement('label');
+                label.innerHTML = `<input type="checkbox" value="${relativePath}" checked> ${relativePath}<br>`;
+                list.appendChild(label);
+                zipFiles.sounds[relativePath] = zipEntry;
+            }
+        });
     };
 
-    // Lógica 3D
-    let isDragging = false;
-    canvas.on('mouse:down', () => { if(card3d.classList.contains('active')) isDragging = true; });
-    window.addEventListener('mouseup', () => isDragging = false);
-    window.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        let x = (e.clientX / window.innerWidth - 0.5) * 360;
-        let y = (e.clientY / window.innerHeight - 0.5) * 360;
-        card3d.style.transform = `rotateY(${-x}deg) rotateX(${y}deg)`;
-    });
+    // Descarga corregida
+    document.getElementById('downloadBtn').onclick = async () => {
+        const zip = new JSZip();
+        
+        // 1. Añadir inventario
+        zip.folder("assets/minecraft/textures/gui/container").file("inventory.png", canvas.toDataURL().split(',')[1], {base64: true});
+        
+        // 2. Añadir solo lo seleccionado
+        const checkboxes = document.querySelectorAll('#soundList input:checked');
+        for (let cb of checkboxes) {
+            const content = await zipFiles.sounds[cb.value].async("blob");
+            zip.file("assets/minecraft/sounds/" + cb.value, content);
+        }
 
-    document.getElementById('readyBtn').onclick = () => { card3d.classList.add('active'); document.getElementById('readyBtn').style.display='none'; document.getElementById('offBtn').style.display='block'; };
-    document.getElementById('offBtn').onclick = () => { card3d.classList.remove('active'); card3d.style.transform = 'rotateY(0deg) rotateX(0deg)'; document.getElementById('readyBtn').style.display='block'; document.getElementById('offBtn').style.display='none'; };
+        const content = await zip.generateAsync({type: "blob"});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(content);
+        a.download = (document.getElementById('packName').value || "MCTweaks") + ".zip";
+        a.click();
+    };
 </script>
 </body>
 </html>
