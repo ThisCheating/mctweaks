@@ -19,140 +19,100 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>MCTweaks.club | Generador Profesional</title>
+    <title>MCTweaks.club | Generador Pro 3D</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; display: flex; justify-content: center; padding: 20px; }
-        .app-wrapper { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; perspective: 1000px; }
-        .card { background: #ffffff; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); transition: transform 0.6s ease; }
+        body { font-family: 'Segoe UI', sans-serif; background: #222; display: flex; justify-content: center; padding: 20px; color: white; }
+        .app-wrapper { display: flex; gap: 40px; flex-wrap: wrap; justify-content: center; }
         
-        /* Efecto 3D aplicado al contenedor */
-        .preview-3d { transform: rotateY(-15deg) rotateX(10deg) scale(0.95); box-shadow: 20px 20px 40px rgba(0,0,0,0.2); }
+        /* Contenedor 3D */
+        .scene { width: 512px; height: 512px; perspective: 1000px; }
+        .card-3d { 
+            width: 100%; height: 100%; position: relative;
+            transition: transform 0.8s ease; transform-style: preserve-3d;
+            cursor: grab;
+        }
+        .card-3d.active { transform: rotateY(-20deg) rotateX(10deg); }
         
-        .controls { width: 380px; display: flex; flex-direction: column; gap: 12px; }
-        canvas { border: 2px dashed #ccc; border-radius: 8px; }
-        .color-palette { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 10px; }
-        .color-btn { border: none; padding: 5px; cursor: pointer; border-radius: 3px; font-size: 10px; font-weight: bold; color: #fff; }
-        .upload-btn { background: #6c63ff; color: white; padding: 10px; border-radius: 6px; border: none; cursor: pointer; width: 100%; transition: 0.3s; }
-        .upload-btn:hover { background: #5a52d5; }
-        #soundList { height: 120px; overflow-y: auto; border: 1px solid #ddd; padding: 5px; font-size: 11px; }
+        /* Capa de "anchura" (grosor) */
+        .depth-layer { 
+            position: absolute; width: 100%; height: 100%; 
+            background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3);
+            transform: translateZ(-20px); border-radius: 12px;
+        }
+
+        #c { background: transparent; border-radius: 8px; }
+        .controls { width: 380px; background: #fff; color: #333; padding: 20px; border-radius: 15px; }
+        .upload-btn { background: #6c63ff; color: white; padding: 10px; border-radius: 6px; border: none; cursor: pointer; width: 100%; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <div class="app-wrapper">
-    <div class="card" id="canvasCard">
-        <canvas id="c" width="512" height="512"></canvas>
+    <div class="scene">
+        <div class="card-3d" id="card3d">
+            <div class="depth-layer"></div>
+            <canvas id="c" width="512" height="512"></canvas>
+        </div>
     </div>
 
     <div class="card controls">
         <h1>MCTweaks.club</h1>
-        
-        <label>Logo del Pack:</label>
-        <input type="file" id="logoInput" accept="image/*">
-        
-        <label>Versión:</label>
-        <select id="versionSelect">
-            <option value="48">1.21.4</option>
-            <option value="34">1.21.1</option>
-            <option value="15">1.20.x</option>
-            <option value="8">1.16.x</option>
-            <option value="1">1.8.9</option>
-        </select>
-
-        <label>Descripción con colores:</label>
-        <div class="color-palette" id="palette"></div>
-        <textarea id="descInput" rows="2">§ePack de §aMCTweaks.club</textarea>
-
-        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">+ Añadir imagen al fondo</button>
+        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">+ Subir Imagen</button>
         <input type="file" id="fileInput" accept="image/*" style="display:none">
-        
-        <label>Mixer de Sonidos (.zip):</label>
-        <input type="file" id="soundInput" accept=".zip">
-        <div id="soundList"></div>
-
-        <button id="readyBtn" class="upload-btn" style="background:#f39c12">Listo: Ver en 3D</button>
-        <button id="downloadBtn" class="upload-btn" style="background:#2ecc71; display:none;">Generar Texture Pack (.zip)</button>
+        <button id="readyBtn" class="upload-btn" style="background:#f39c12">Listo: Transición 3D</button>
+        <button id="downloadBtn" class="upload-btn" style="background:#2ecc71; display:none;">Descargar Pack</button>
     </div>
 </div>
 
 <script>
     const canvas = new fabric.Canvas('c');
     let template = null;
-    let selectedSounds = new Map();
 
-    // 1. Carga del Template
+    // Cargar Template original
     fabric.Image.fromURL('inventory.png', (img) => {
-        template = img;
-        template.set({ selectable: false, evented: false, originX: 'center', originY: 'center', left: 256, top: 256 });
+        template = img.set({ selectable: false, originX: 'center', originY: 'center', left: 256, top: 256 });
         canvas.add(template);
-        template.bringToFront();
     }, { crossOrigin: 'anonymous' });
 
-    // Paleta de colores
-    const colors = [
-        {c:'§0', b:'#000000', n:'Negro'}, {c:'§1', b:'#0000AA', n:'Azul'}, {c:'§2', b:'#00AA00', n:'Verde'}, {c:'§3', b:'#00AAAA', n:'Aqua'},
-        {c:'§4', b:'#AA0000', n:'Rojo'}, {c:'§5', b:'#AA00AA', n:'Morado'}, {c:'§6', b:'#FFAA00', n:'Dorado'}, {c:'§7', b:'#AAAAAA', n:'Gris'}
-    ];
-    const palette = document.getElementById('palette');
-    colors.forEach(col => {
-        const b = document.createElement('button');
-        b.className = 'color-btn'; b.style.backgroundColor = col.b; b.innerText = col.n;
-        b.onclick = () => insertColor(col.c);
-        palette.appendChild(b);
-    });
-
-    function insertColor(code) {
-        const t = document.getElementById('descInput');
-        t.value += code;
-        t.focus();
-    }
-
-    // 2. Subida de imagen
+    // Subir imagen
     document.getElementById('fileInput').addEventListener('change', (e) => {
         const reader = new FileReader();
         reader.onload = (ev) => {
             fabric.Image.fromURL(ev.target.result, (img) => {
                 img.set({ originX: 'center', originY: 'center', left: 256, top: 256 });
-                img.scaleToWidth(200);
                 canvas.add(img);
                 img.sendToBack();
-                if(template) template.bringToFront();
                 canvas.renderAll();
             });
         };
         reader.readAsDataURL(e.target.files[0]);
     });
 
-    // 3. Botón "Listo" (Efecto 3D)
-    document.getElementById('readyBtn').addEventListener('click', () => {
-        document.getElementById('canvasCard').classList.add('preview-3d');
+    // Transición a 3D Transparente
+    document.getElementById('readyBtn').onclick = () => {
+        const card = document.getElementById('card3d');
+        const canvasEl = document.getElementById('c');
+        
+        // Hacer transparente el fondo del canvas
+        canvas.setBackgroundColor('transparent');
+        canvas.renderAll();
+        
+        // Activar rotación
+        card.classList.add('active');
         document.getElementById('readyBtn').style.display = "none";
         document.getElementById('downloadBtn').style.display = "block";
-    });
+    };
 
-    // 4. Generación Zip
-    document.getElementById('downloadBtn').addEventListener('click', async () => {
-        const zip = new JSZip();
-        const canvasData = canvas.toDataURL({format: 'png'}).split(',')[1];
-        zip.folder("assets/minecraft/textures/gui/container").file("inventory.png", canvasData, {base64: true});
-
-        if (document.getElementById('logoInput').files[0]) {
-            const logo = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result.split(',')[1]); fr.readAsDataURL(document.getElementById('logoInput').files[0]); });
-            zip.file("pack.png", logo, {base64: true});
-        }
-
-        zip.file("pack.mcmeta", JSON.stringify({
-            pack: { pack_format: parseInt(document.getElementById('versionSelect').value), description: document.getElementById('descInput').value }
-        }, null, 2));
-
-        const content = await zip.generateAsync({type: "blob"});
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(content);
-        link.download = "MCTweaks_Pack.zip";
-        link.click();
-    });
+    // Control de rotación con Mouse
+    const card = document.getElementById('card3d');
+    card.onmousemove = (e) => {
+        if(!card.classList.contains('active')) return;
+        let x = (e.clientX / window.innerWidth - 0.5) * 40;
+        let y = (e.clientY / window.innerHeight - 0.5) * 40;
+        card.style.transform = `rotateY(${-x}deg) rotateX(${y}deg) translateZ(0)`;
+    };
 </script>
 </body>
 </html>
