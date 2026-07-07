@@ -23,302 +23,136 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        :root { 
-            --primary: #6c63ff; 
-            --success: #2ecc71; 
-            --bg: #eaeaea; 
-            --minecraft-bg: url('https://www.transparenttextures.com/patterns/wood-pattern.png'); /* Textura de madera sutil */
-        }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; color: #333; }
-        .app-wrapper { display: flex; gap: 30px; flex-wrap: wrap; justify-content: center; max-width: 1200px; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; display: flex; justify-content: center; padding: 20px; }
+        .app-wrapper { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; perspective: 1000px; }
+        .card { background: #ffffff; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); transition: transform 0.6s ease; }
         
-        /* Contenedor del Canvas - Área de trabajo */
-        .canvas-wrapper { 
-            position: relative; 
-            width: 512px; 
-            height: 512px; 
-            background: var(--minecraft-bg), #8e8e8e; /* Fondo estilo Minecraft */
-            border-radius: 12px;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
-            transition: transform 0.6s ease, box-shadow 0.6s ease;
-            /* Necesario para el efecto 3D */
-            perspective: 1500px; 
-            transform-style: preserve-3d;
-        }
-
-        /* Clase que activa la vista 3D profesional */
-        .canvas-wrapper.is-3d {
-            transform: rotateY(-12deg) rotateX(8deg) scale(1.05);
-            box-shadow: 20px 20px 40px rgba(0,0,0,0.4);
-        }
-
-        #c { 
-            border-radius: 12px; 
-            cursor: crosshair;
-        }
-
-        .card { background: #ffffff; padding: 25px; border-radius: 15px; box-shadow: 0 6px 20px rgba(0,0,0,0.1); flex: 1; min-width: 360px; max-width: 400px;}
-        h1 { margin: 0 0 15px 0; font-size: 22px; color: var(--primary); text-align: center;}
+        /* Efecto 3D aplicado al contenedor */
+        .preview-3d { transform: rotateY(-15deg) rotateX(10deg) scale(0.95); box-shadow: 20px 20px 40px rgba(0,0,0,0.2); }
         
-        .control-group { margin-bottom: 15px; display: flex; flex-direction: column; gap: 5px; }
-        label { font-weight: 600; font-size: 12px; color: #555; }
-        
-        input[type="file"], select, textarea { padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
-        textarea { resize: none; font-family: monospace; }
-
-        .color-palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-bottom: 5px; }
-        .color-btn { border: none; height: 22px; cursor: pointer; border-radius: 3px; transition: transform 0.1s; }
-        .color-btn:hover { transform: scale(1.1); }
-
-        .btn { border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; width: 100%; transition: background 0.3s, opacity 0.3s; margin-top: 10px;}
-        .btn-upload { background: #6c63ff; color: white; }
-        .btn-upload:hover { background: #5753d9; }
-        
-        .btn-ready { background: #f39c12; color: white; } /* Naranja para "Listo" */
-        .btn-ready:hover { background: #d68910; }
-        
-        .btn-download { background: var(--success); color: white; display: none; } /* Oculto por defecto */
-        .btn-download:hover { background: #27ae60; }
-
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        #soundList { height: 90px; overflow-y: auto; border: 1px solid #eee; padding: 5px; font-size: 11px; background: #fafafa; border-radius: 4px; }
-        #soundList div { padding: 2px; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between;}
+        .controls { width: 380px; display: flex; flex-direction: column; gap: 12px; }
+        canvas { border: 2px dashed #ccc; border-radius: 8px; }
+        .color-palette { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 10px; }
+        .color-btn { border: none; padding: 5px; cursor: pointer; border-radius: 3px; font-size: 10px; font-weight: bold; color: #fff; }
+        .upload-btn { background: #6c63ff; color: white; padding: 10px; border-radius: 6px; border: none; cursor: pointer; width: 100%; transition: 0.3s; }
+        .upload-btn:hover { background: #5a52d5; }
+        #soundList { height: 120px; overflow-y: auto; border: 1px solid #ddd; padding: 5px; font-size: 11px; }
     </style>
 </head>
 <body>
 
 <div class="app-wrapper">
-    <div class="canvas-wrapper" id="canvasWrapper">
+    <div class="card" id="canvasCard">
         <canvas id="c" width="512" height="512"></canvas>
     </div>
 
-    <div class="card">
-        <h1>MCTweaks Studio</h1>
+    <div class="card controls">
+        <h1>MCTweaks.club</h1>
         
-        <div class="control-group">
-            <label>Logo del Pack (pack.png):</label>
-            <input type="file" id="logoInput" accept="image/*">
-        </div>
+        <label>Logo del Pack:</label>
+        <input type="file" id="logoInput" accept="image/*">
+        
+        <label>Versión:</label>
+        <select id="versionSelect">
+            <option value="48">1.21.4</option>
+            <option value="34">1.21.1</option>
+            <option value="15">1.20.x</option>
+            <option value="8">1.16.x</option>
+            <option value="1">1.8.9</option>
+        </select>
 
-        <div class="control-group">
-            <label>Versión del Pack:</label>
-            <select id="versionSelect">
-                <option value="48">1.21.4 (Snapshot)</option>
-                <option value="34">1.21 - 1.21.1</option>
-                <option value="15">1.20 - 1.20.4</option>
-                <option value="8">1.16.2 - 1.16.5</option>
-                <option value="1">1.8.9</option>
-            </select>
-        </div>
+        <label>Descripción con colores:</label>
+        <div class="color-palette" id="palette"></div>
+        <textarea id="descInput" rows="2">§ePack de §aMCTweaks.club</textarea>
 
-        <div class="control-group">
-            <label>Descripción (Soporta códigos §):</label>
-            <div class="color-palette" id="palette"></div>
-            <textarea id="descInput" rows="2">§ePack Creado por §aMCTweaks.club</textarea>
-        </div>
+        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">+ Añadir imagen al fondo</button>
+        <input type="file" id="fileInput" accept="image/*" style="display:none">
+        
+        <label>Mixer de Sonidos (.zip):</label>
+        <input type="file" id="soundInput" accept=".zip">
+        <div id="soundList"></div>
 
-        <div class="control-group">
-            <label>1. Fondo de Inventario (gui/container/inventory.png):</label>
-            <button class="btn btn-upload" onclick="document.getElementById('fileInput').click()">+ Subir Imagen de Fondo</button>
-            <input type="file" id="fileInput" accept="image/*" style="display:none">
-        </div>
-
-        <div class="control-group">
-            <label>2. Mixer de Sonidos (Opcional .zip):</label>
-            <input type="file" id="soundInput" accept=".zip">
-            <div id="soundList"></div>
-        </div>
-
-        <button id="readyBtn" class="btn btn-ready" onclick="prepararDescarga()">Listo: Activar Vista 3D y Validar</button>
-        <button id="downloadBtn" class="btn btn-download" onclick="generarZip()">Descargar Texture Pack (.zip)</button>
+        <button id="readyBtn" class="upload-btn" style="background:#f39c12">Listo: Ver en 3D</button>
+        <button id="downloadBtn" class="upload-btn" style="background:#2ecc71; display:none;">Generar Texture Pack (.zip)</button>
     </div>
 </div>
 
 <script>
-    // Inicializar Canvas Fabric.js
     const canvas = new fabric.Canvas('c');
-    let templateImgObj = null;
-    let userBgImgObj = null;
+    let template = null;
     let selectedSounds = new Map();
 
-    // --- 1. Cargar Textura Base (Plantilla de Inventario) ---
-    // IMPORTANTE: Reemplaza 'inventory_template.png' por la ruta real de tu imagen transparente.
-    // Para pruebas, asegúrate de tener una imagen en la misma carpeta o usa una URL directa.
-    const TEMPLATE_URL = 'inventory.png'; 
-
-    fabric.Image.fromURL(TEMPLATE_URL, function(oImg) {
-        templateImgObj = oImg;
-        // Configurar propiedades: no seleccionable, centrado
-        templateImgObj.set({
-            selectable: false,
-            evented: false, // Permite hacer click a través de ella
-            originX: 'center',
-            originY: 'center',
-            left: 256,
-            top: 256,
-            scaleX: 1, // Ajusta si la imagen es de otro tamaño
-            scaleY: 1
-        });
-        canvas.add(templateImgObj);
-        templateImgObj.bringToFront(); // Asegurar que esté siempre encima
-        canvas.renderAll();
+    // 1. Carga del Template
+    fabric.Image.fromURL('inventory.png', (img) => {
+        template = img;
+        template.set({ selectable: false, evented: false, originX: 'center', originY: 'center', left: 256, top: 256 });
+        canvas.add(template);
+        template.bringToFront();
     }, { crossOrigin: 'anonymous' });
 
-    // --- 2. Lógica de Paleta de Colores ---
+    // Paleta de colores
     const colors = [
-        {c:'§0', b:'#000000'}, {c:'§1', b:'#0000AA'}, {c:'§2', b:'#00AA00'}, {c:'§3', b:'#00AAAA'},
-        {c:'§4', b:'#AA0000'}, {c:'§5', b:'#AA00AA'}, {c:'§6', b:'#FFAA00'}, {c:'§7', b:'#AAAAAA'},
-        {c:'§8', b:'#555555'}, {c:'§9', b:'#5555FF'}, {c:'§a', b:'#55FF55'}, {c:'§b', b:'#55FFFF'},
-        {c:'§c', b:'#FF5555'}, {c:'§d', b:'#FF55FF'}, {c:'§e', b:'#FFFF55'}, {c:'§f', b:'#FFFFFF'}
+        {c:'§0', b:'#000000', n:'Negro'}, {c:'§1', b:'#0000AA', n:'Azul'}, {c:'§2', b:'#00AA00', n:'Verde'}, {c:'§3', b:'#00AAAA', n:'Aqua'},
+        {c:'§4', b:'#AA0000', n:'Rojo'}, {c:'§5', b:'#AA00AA', n:'Morado'}, {c:'§6', b:'#FFAA00', n:'Dorado'}, {c:'§7', b:'#AAAAAA', n:'Gris'}
     ];
-    
     const palette = document.getElementById('palette');
     colors.forEach(col => {
         const b = document.createElement('button');
-        b.className = 'color-btn';
-        b.style.backgroundColor = col.b;
-        b.title = col.c;
-        b.onclick = () => insertAtCursor(document.getElementById('descInput'), col.c);
+        b.className = 'color-btn'; b.style.backgroundColor = col.b; b.innerText = col.n;
+        b.onclick = () => insertColor(col.c);
         palette.appendChild(b);
     });
 
-    function insertAtCursor(myField, myValue) {
-        if (document.selection) {
-            myField.focus();
-            sel = document.selection.createRange();
-            sel.text = myValue;
-        } else if (myField.selectionStart || myField.selectionStart == '0') {
-            var startPos = myField.selectionStart;
-            var endPos = myField.selectionEnd;
-            myField.value = myField.value.substring(0, startPos) + myValue + myField.value.substring(endPos, myField.value.length);
-            myField.selectionStart = startPos + myValue.length;
-            myField.selectionEnd = startPos + myValue.length;
-            myField.focus();
-        } else {
-            myField.value += myValue;
-        }
+    function insertColor(code) {
+        const t = document.getElementById('descInput');
+        t.value += code;
+        t.focus();
     }
 
-    // --- 3. Manejo de Subida de Imagen de Fondo (CORREGIDO) ---
-    document.getElementById('fileInput').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-
+    // 2. Subida de imagen
+    document.getElementById('fileInput').addEventListener('change', (e) => {
         const reader = new FileReader();
-        reader.onload = function(event) {
-            // Eliminar fondo anterior si existe para no saturar
-            if (userBgImgObj) {
-                canvas.remove(userBgImgObj);
-            }
-
-            fabric.Image.fromURL(event.target.result, function(img) {
-                userBgImgObj = img;
-                
-                // Calcular escala para que cubra el área de diseño (aprox 176x166 en GUI estandar)
-                // Ajusta estos valores según el tamaño de tu plantilla inventory.png
-                const GUI_WIDTH = 350; 
-                const scale = Math.max(GUI_WIDTH / img.width, GUI_WIDTH / img.height);
-
-                userBgImgObj.set({
-                    originX: 'center',
-                    originY: 'center',
-                    left: 256,
-                    top: 256,
-                    scaleX: scale,
-                    scaleY: scale,
-                    selectable: true, // Permite al usuario mover/escalar su fondo
-                    hasControls: true
-                });
-
-                // Añadir al canvas y enviarlo al fondo
-                canvas.add(userBgImgObj);
-                userBgImgObj.sendToBack();
-                
-                // Asegurar que la plantilla esté siempre arriba
-                if (templateImgObj) templateImgObj.bringToFront();
-                
-                canvas.setActiveObject(userBgImgObj);
+        reader.onload = (ev) => {
+            fabric.Image.fromURL(ev.target.result, (img) => {
+                img.set({ originX: 'center', originY: 'center', left: 256, top: 256 });
+                img.scaleToWidth(200);
+                canvas.add(img);
+                img.sendToBack();
+                if(template) template.bringToFront();
                 canvas.renderAll();
             });
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(e.target.files[0]);
     });
 
-    // --- 4. Procesar Sonidos (.zip) ---
-    document.getElementById('soundInput').addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if(!file) return;
-        
-        selectedSounds.clear();
-        const soundListDiv = document.getElementById('soundList');
-        soundListDiv.innerHTML = '<em>Cargando sonidos...</em>';
+    // 3. Botón "Listo" (Efecto 3D)
+    document.getElementById('readyBtn').addEventListener('click', () => {
+        document.getElementById('canvasCard').classList.add('preview-3d');
+        document.getElementById('readyBtn').style.display = "none";
+        document.getElementById('downloadBtn').style.display = "block";
+    });
 
-        try {
-            const zip = await JSZip.loadAsync(file);
-            soundListDiv.innerHTML = ''; // Limpiar
+    // 4. Generación Zip
+    document.getElementById('downloadBtn').addEventListener('click', async () => {
+        const zip = new JSZip();
+        const canvasData = canvas.toDataURL({format: 'png'}).split(',')[1];
+        zip.folder("assets/minecraft/textures/gui/container").file("inventory.png", canvasData, {base64: true});
 
-            zip.forEach((relativePath, zipEntry) => {
-                if (relativePath.endsWith('.ogg') && !relativePath.startsWith('__MACOSX')) {
-                    selectedSounds.set(relativePath, zipEntry);
-                    
-                    const itemDiv = document.createElement('div');
-                    itemDiv.innerHTML = `<span>${relativePath.split('/').pop()}</span>`;
-                    
-                    const playBtn = document.createElement('button');
-                    playBtn.innerText = '▶';
-                    playBtn.style.fontSize = '10px';
-                    playBtn.onclick = async () => {
-                        const blob = await zipEntry.async("blob");
-                        const audio = new Audio(URL.createObjectURL(blob));
-                        audio.play();
-                    };
-                    itemDiv.appendChild(playBtn);
-                    soundListDiv.appendChild(itemDiv);
-                }
-            });
-
-            if(selectedSounds.size === 0) {
-                soundListDiv.innerHTML = '<em>No se encontraron archivos .ogg válidos.</em>';
-            }
-        } catch (err) {
-            console.error("Error leyendo ZIP", err);
-            soundListDiv.innerHTML = '<em>Error al leer el archivo ZIP.</em>';
+        if (document.getElementById('logoInput').files[0]) {
+            const logo = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result.split(',')[1]); fr.readAsDataURL(document.getElementById('logoInput').files[0]); });
+            zip.file("pack.png", logo, {base64: true});
         }
+
+        zip.file("pack.mcmeta", JSON.stringify({
+            pack: { pack_format: parseInt(document.getElementById('versionSelect').value), description: document.getElementById('descInput').value }
+        }, null, 2));
+
+        const content = await zip.generateAsync({type: "blob"});
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(content);
+        link.download = "MCTweaks_Pack.zip";
+        link.click();
     });
-
-    // --- 5. Flujo: Botón "Listo" (Activa 3D y Valida) ---
-    function prepararDescarga() {
-        const wrapper = document.getElementById('canvasWrapper');
-        const btnReady = document.getElementById('readyBtn');
-        const btnDownload = document.getElementById('downloadBtn');
-
-        // Activar efecto visual 3D
-        wrapper.classList.add('is-3d');
-        
-        // Deshabilitar edición en el canvas para la vista previa
-        canvas.discardActiveObject();
-        canvas.getObjects().forEach(obj => {
-            obj.set({ selectable: false, evented: false });
-        });
-        canvas.renderAll();
-
-        // Cambiar botones
-        btnReady.innerText = "¡Vista 3D Activada!";
-        btnReady.disabled = true;
-        btnReady.style.background = "#999";
-        
-        // Mostrar botón de descarga
-        btnDownload.style.display = "block";
-        
-        // Pequeño scroll para asegurar que se ve el botón
-        btnDownload.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-
-    // --- 6. Generar Archivo Final (.zip) ---
-    async function generarZip() {
-        const btn = document.getElementById('downloadBtn');
-        btn.innerText = "Generando...";
-        btn.disabled = true;
-
-        const zip = new
+</script>
+</body>
+</html>
