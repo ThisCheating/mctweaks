@@ -19,82 +19,99 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>MCTweaks | Editor Pro</title>
+    <title>MCTweaks | Editor Avanzado</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root { --primary: #6c63ff; --dark: #1a1a1a; }
         body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; margin: 0; }
-        .app-wrapper { display: flex; gap: 20px; justify-content: center; padding: 20px; flex-wrap: wrap; }
-        .scene { width: 512px; height: 512px; position: relative; }
-        #c { background: transparent; border: 1px solid #333; border-radius: 8px; }
+        .app-wrapper { display: flex; gap: 40px; justify-content: center; padding: 20px; flex-wrap: wrap; }
+        .scene { width: 512px; height: 512px; perspective: 1200px; position: relative; z-index: 10; }
+        .card-3d { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.05s linear; }
+        #c { background: transparent; border-radius: 12px; cursor: grab; position: absolute; top:0; left:0; }
         .controls { width: 400px; background: var(--dark); padding: 20px; border-radius: 15px; border: 1px solid #333; }
-        .file-list { max-height: 150px; overflow-y: auto; background: #000; padding: 10px; margin: 5px 0; font-size: 12px; }
-        .btn-main { background: var(--primary); color: white; padding: 10px; border: none; cursor: pointer; width: 100%; margin-top: 10px; border-radius: 5px; }
+        details { background: #222; margin-bottom: 10px; padding: 10px; border-radius: 5px; }
+        summary { font-weight: bold; color: var(--primary); cursor: pointer; }
+        .file-list { max-height: 120px; overflow-y: auto; font-size: 11px; margin-top: 5px; color: #ccc; }
+        .btn-main { background: var(--primary); color: white; padding: 12px; border: none; width: 100%; margin-top: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="app-wrapper">
     <div class="scene">
-        <canvas id="c" width="512" height="512"></canvas>
+        <div class="card-3d" id="card3d">
+            <canvas id="c" width="512" height="512"></canvas>
+        </div>
     </div>
 
     <div class="controls">
-        <h3>Editor MCTweaks</h3>
-        <input type="text" id="packName" placeholder="Nombre del Pack" style="width:100%; padding:5px; margin-bottom:10px;">
+        <input type="text" id="packName" placeholder="Nombre del Pack" style="width:100%; padding:8px; background:#000; color:#fff; border:1px solid #444; border-radius:5px;">
         
         <details>
-            <summary>Selector de Sonidos (ZIP)</summary>
+            <summary>Sound Mixer (Selecciona archivos)</summary>
             <input type="file" id="soundInput" accept=".zip">
             <div id="soundList" class="file-list"></div>
         </details>
 
-        <button id="downloadBtn" class="btn-main" style="background:#2ecc71;">Descargar Pack Completo</button>
+        <details>
+            <summary>SkyOverlay Mixer (Selecciona archivos)</summary>
+            <input type="file" id="skyInput" accept=".zip">
+            <div id="skyList" class="file-list"></div>
+        </details>
+
+        <button id="downloadBtn" class="btn-main" style="background:#2ecc71;">Generar y Descargar .zip</button>
     </div>
 </div>
 
 <script>
     const canvas = new fabric.Canvas('c');
-    let zipFiles = { sounds: {} };
+    let zipCache = { sounds: null, sky: null };
 
-    // Leer ZIP y mostrar archivos para seleccionar
-    document.getElementById('soundInput').onchange = async (e) => {
+    // Procesar ZIP subido
+    async function handleZip(e, listId, type) {
         const file = e.target.files[0];
         const zip = await JSZip.loadAsync(file);
-        const list = document.getElementById('soundList');
-        list.innerHTML = '';
+        zipCache[type] = zip;
+        const listDiv = document.getElementById(listId);
+        listDiv.innerHTML = '';
         
-        zip.forEach((relativePath, zipEntry) => {
-            if (!zipEntry.dir) {
-                const label = document.createElement('label');
-                label.innerHTML = `<input type="checkbox" value="${relativePath}" checked> ${relativePath}<br>`;
-                list.appendChild(label);
-                zipFiles.sounds[relativePath] = zipEntry;
+        zip.forEach((path, entry) => {
+            if (!entry.dir) {
+                listDiv.innerHTML += `<label><input type="checkbox" class="${type}-check" value="${path}" checked> ${path.split('/').pop()}</label><br>`;
             }
         });
-    };
+    }
 
-    // Descarga corregida
+    document.getElementById('soundInput').onchange = (e) => handleZip(e, 'soundList', 'sounds');
+    document.getElementById('skyInput').onchange = (e) => handleZip(e, 'skyList', 'sky');
+
     document.getElementById('downloadBtn').onclick = async () => {
         const zip = new JSZip();
-        
-        // 1. Añadir inventario
         zip.folder("assets/minecraft/textures/gui/container").file("inventory.png", canvas.toDataURL().split(',')[1], {base64: true});
-        
-        // 2. Añadir solo lo seleccionado
-        const checkboxes = document.querySelectorAll('#soundList input:checked');
-        for (let cb of checkboxes) {
-            const content = await zipFiles.sounds[cb.value].async("blob");
-            zip.file("assets/minecraft/sounds/" + cb.value, content);
-        }
 
-        const content = await zip.generateAsync({type: "blob"});
+        // Procesar sonidos seleccionados
+        document.querySelectorAll('.sounds-check:checked').forEach(cb => {
+            zip.file("assets/minecraft/sounds/" + cb.value, zipCache.sounds.file(cb.value).async("blob"));
+        });
+
+        // Procesar sky seleccionados
+        document.querySelectorAll('.sky-check:checked').forEach(cb => {
+            zip.file("assets/minecraft/textures/environment/sky/" + cb.value, zipCache.sky.file(cb.value).async("blob"));
+        });
+
+        const blob = await zip.generateAsync({type: "blob"});
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(content);
-        a.download = (document.getElementById('packName').value || "MCTweaks") + ".zip";
+        a.href = URL.createObjectURL(blob);
+        a.download = (document.getElementById('packName').value || "MCTweaksPack") + ".zip";
         a.click();
     };
+
+    // Cargar Template
+    fabric.Image.fromURL('inventory.png', (img) => {
+        img.set({ selectable: false, evented: false, originX: 'center', originY: 'center', left: 256, top: 256 });
+        canvas.add(img);
+    }, { crossOrigin: 'anonymous' });
 </script>
 </body>
 </html>
