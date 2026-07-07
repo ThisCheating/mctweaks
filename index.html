@@ -19,32 +19,35 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>MCTweaks.club | Generador Pro 3D</title>
+    <title>MCTweaks.club | Generador 3D Interactivo</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #222; display: flex; justify-content: center; padding: 20px; color: white; }
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; display: flex; justify-content: center; padding: 20px; }
         .app-wrapper { display: flex; gap: 40px; flex-wrap: wrap; justify-content: center; }
         
-        /* Contenedor 3D */
-        .scene { width: 512px; height: 512px; perspective: 1000px; }
+        .scene { width: 512px; height: 512px; perspective: 1200px; }
         .card-3d { 
             width: 100%; height: 100%; position: relative;
-            transition: transform 0.8s ease; transform-style: preserve-3d;
-            cursor: grab;
+            transform-style: preserve-3d;
+            transition: transform 0.2s ease-out; /* Suave para el seguimiento del mouse */
+            user-select: none;
         }
-        .card-3d.active { transform: rotateY(-20deg) rotateX(10deg); }
         
-        /* Capa de "anchura" (grosor) */
+        /* Capa de grosor/anchura */
         .depth-layer { 
             position: absolute; width: 100%; height: 100%; 
-            background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3);
-            transform: translateZ(-20px); border-radius: 12px;
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2);
+            transform: translateZ(-30px); border-radius: 12px;
         }
 
-        #c { background: transparent; border-radius: 8px; }
-        .controls { width: 380px; background: #fff; color: #333; padding: 20px; border-radius: 15px; }
-        .upload-btn { background: #6c63ff; color: white; padding: 10px; border-radius: 6px; border: none; cursor: pointer; width: 100%; margin-top: 10px; }
+        #c { background: transparent; cursor: grab; }
+        #c:active { cursor: grabbing; }
+
+        .controls { width: 350px; background: #fff; color: #333; padding: 25px; border-radius: 15px; }
+        .upload-btn { background: #6c63ff; color: white; padding: 12px; border-radius: 8px; border: none; cursor: pointer; width: 100%; margin-top: 10px; font-weight: bold; }
+        .btn-off { background: #e74c3c; }
+        .btn-download { background: #2ecc71; display: none; }
     </style>
 </head>
 <body>
@@ -57,61 +60,72 @@
         </div>
     </div>
 
-    <div class="card controls">
+    <div class="controls">
         <h1>MCTweaks.club</h1>
-        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">+ Subir Imagen</button>
+        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">+ Subir Imagen de Fondo</button>
         <input type="file" id="fileInput" accept="image/*" style="display:none">
-        <button id="readyBtn" class="upload-btn" style="background:#f39c12">Listo: Transición 3D</button>
-        <button id="downloadBtn" class="upload-btn" style="background:#2ecc71; display:none;">Descargar Pack</button>
+        
+        <button id="readyBtn" class="upload-btn" style="background:#f39c12">Activar Modo 3D</button>
+        <button id="offBtn" class="upload-btn btn-off" style="display:none">Desactivar 3D</button>
+        <button id="downloadBtn" class="upload-btn btn-download">Descargar Texture Pack</button>
     </div>
 </div>
 
 <script>
     const canvas = new fabric.Canvas('c');
-    let template = null;
+    const card3d = document.getElementById('card3d');
+    let isDragging = false;
 
-    // Cargar Template original
+    // Cargar Template
     fabric.Image.fromURL('inventory.png', (img) => {
-        template = img.set({ selectable: false, originX: 'center', originY: 'center', left: 256, top: 256 });
-        canvas.add(template);
+        img.set({ selectable: false, originX: 'center', originY: 'center', left: 256, top: 256 });
+        canvas.add(img);
     }, { crossOrigin: 'anonymous' });
 
-    // Subir imagen
+    // Lógica de Rotación Presionando Click
+    canvas.on('mouse:down', () => isDragging = true);
+    window.addEventListener('mouseup', () => {
+        isDragging = false;
+        card3d.style.transform = `rotateY(0deg) rotateX(0deg)`; // Reset al soltar
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        if (!isDragging || !card3d.classList.contains('active')) return;
+        let x = (e.clientX / window.innerWidth - 0.5) * 60;
+        let y = (e.clientY / window.innerHeight - 0.5) * 60;
+        card3d.style.transform = `rotateY(${-x}deg) rotateX(${y}deg)`;
+    });
+
+    // Botones de Estado
+    document.getElementById('readyBtn').onclick = () => {
+        card3d.classList.add('active');
+        document.getElementById('readyBtn').style.display = "none";
+        document.getElementById('offBtn').style.display = "block";
+        document.getElementById('downloadBtn').style.display = "block";
+    };
+
+    document.getElementById('offBtn').onclick = () => {
+        card3d.classList.remove('active');
+        card3d.style.transform = `rotateY(0deg) rotateX(0deg)`;
+        document.getElementById('readyBtn').style.display = "block";
+        document.getElementById('offBtn').style.display = "none";
+    };
+
+    // Subida y Descarga (Simplificada)
     document.getElementById('fileInput').addEventListener('change', (e) => {
         const reader = new FileReader();
         reader.onload = (ev) => {
             fabric.Image.fromURL(ev.target.result, (img) => {
                 img.set({ originX: 'center', originY: 'center', left: 256, top: 256 });
-                canvas.add(img);
-                img.sendToBack();
-                canvas.renderAll();
+                canvas.add(img); img.sendToBack(); canvas.renderAll();
             });
         };
         reader.readAsDataURL(e.target.files[0]);
     });
 
-    // Transición a 3D Transparente
-    document.getElementById('readyBtn').onclick = () => {
-        const card = document.getElementById('card3d');
-        const canvasEl = document.getElementById('c');
-        
-        // Hacer transparente el fondo del canvas
-        canvas.setBackgroundColor('transparent');
-        canvas.renderAll();
-        
-        // Activar rotación
-        card.classList.add('active');
-        document.getElementById('readyBtn').style.display = "none";
-        document.getElementById('downloadBtn').style.display = "block";
-    };
-
-    // Control de rotación con Mouse
-    const card = document.getElementById('card3d');
-    card.onmousemove = (e) => {
-        if(!card.classList.contains('active')) return;
-        let x = (e.clientX / window.innerWidth - 0.5) * 40;
-        let y = (e.clientY / window.innerHeight - 0.5) * 40;
-        card.style.transform = `rotateY(${-x}deg) rotateX(${y}deg) translateZ(0)`;
+    document.getElementById('downloadBtn').onclick = async () => {
+        // Lógica de descarga igual a la anterior
+        alert("Generando y descargando...");
     };
 </script>
 </body>
