@@ -19,7 +19,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>MCTweaks.club | Generador 3D Pro</title>
+    <title>MCTweaks.club | Generador 3D Final</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
@@ -27,17 +27,17 @@
         .app-wrapper { display: flex; gap: 40px; flex-wrap: wrap; justify-content: center; align-items: center; }
         
         .scene { width: 512px; height: 512px; perspective: 1500px; }
+        
         .card-3d { 
             width: 100%; height: 100%; position: relative; transform-style: preserve-3d;
             transition: transform 0.05s linear; user-select: none; will-change: transform;
         }
-        /* Cuando está activo, quitamos bordes de contenedor */
-        .card-3d.active { cursor: grabbing; border: none; }
         
-        /* Capa de grosor (solo se ve en 3D) */
+        /* Solo mostrar el marco de profundidad cuando estamos en modo 3D */
         .depth-layer { 
             position: absolute; width: 100%; height: 100%; background: rgba(255,255,255,0.03); 
-            border: 1px solid rgba(255,255,255,0.1); transform: translateZ(-40px); border-radius: 12px; pointer-events: none; opacity: 0;
+            border: 1px solid rgba(255,255,255,0.1); transform: translateZ(-40px); 
+            border-radius: 12px; pointer-events: none; opacity: 0; transition: opacity 0.3s;
         }
         .card-3d.active .depth-layer { opacity: 1; }
 
@@ -63,7 +63,6 @@
         <input type="file" id="fileInput" accept="image/*" style="display:none">
         <button id="readyBtn" class="upload-btn" style="background:#f39c12">Activar Modo 3D</button>
         <button id="offBtn" class="upload-btn" style="background:#e74c3c; display:none">Desactivar 3D</button>
-        <button id="downloadBtn" class="upload-btn" style="background:#2ecc71">Descargar Texture Pack</button>
     </div>
 </div>
 
@@ -72,12 +71,13 @@
     const card3d = document.getElementById('card3d');
     let isDragging = false;
 
+    // Cargar Template
     fabric.Image.fromURL('inventory.png', (img) => {
         img.set({ selectable: false, evented: false, originX: 'center', originY: 'center', left: 256, top: 256 });
         canvas.add(img);
     }, { crossOrigin: 'anonymous' });
 
-    // Lógica 3D Sensible y 360°
+    // Lógica 3D 360° (Sensibilidad alta)
     canvas.on('mouse:down', () => { if(card3d.classList.contains('active')) isDragging = true; });
     window.addEventListener('mouseup', () => { isDragging = false; });
     window.addEventListener('mousemove', (e) => {
@@ -88,22 +88,20 @@
     });
 
     document.getElementById('readyBtn').onclick = () => {
-        // 1. Desactivar selección de Fabric.js
+        // Ocultar bordes de selección de Fabric
         canvas.discardActiveObject();
         canvas.forEachObject(obj => { obj.selectable = false; obj.evented = false; });
         canvas.renderAll();
         
-        // 2. Activar vista 3D limpia
         card3d.classList.add('active');
         document.getElementById('readyBtn').style.display = "none";
         document.getElementById('offBtn').style.display = "block";
     };
 
     document.getElementById('offBtn').onclick = () => {
-        // 1. Reactivar selección
+        // Reactivar edición
         canvas.forEachObject(obj => { obj.selectable = true; obj.evented = true; });
         
-        // 2. Desactivar vista 3D
         card3d.classList.remove('active');
         card3d.style.transform = `rotateY(0deg) rotateX(0deg)`;
         document.getElementById('readyBtn').style.display = "block";
@@ -121,5 +119,7 @@
         reader.readAsDataURL(e.target.files[0]);
     });
 </script>
+</body>
+</html>
 </body>
 </html>
