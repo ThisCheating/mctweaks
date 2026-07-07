@@ -19,35 +19,33 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>MCTweaks.club | Generador 3D Interactivo</title>
+    <title>MCTweaks.club | Generador 3D Pro</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; display: flex; justify-content: center; padding: 20px; }
-        .app-wrapper { display: flex; gap: 40px; flex-wrap: wrap; justify-content: center; }
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #fff; display: flex; justify-content: center; padding: 20px; margin: 0; }
+        .app-wrapper { display: flex; gap: 40px; flex-wrap: wrap; justify-content: center; align-items: center; }
         
-        .scene { width: 512px; height: 512px; perspective: 1200px; }
+        /* Contenedor 3D */
+        .scene { width: 512px; height: 512px; perspective: 1500px; }
         .card-3d { 
-            width: 100%; height: 100%; position: relative;
-            transform-style: preserve-3d;
-            transition: transform 0.2s ease-out; /* Suave para el seguimiento del mouse */
-            user-select: none;
+            width: 100%; height: 100%; position: relative; transform-style: preserve-3d;
+            transition: transform 0.1s linear; user-select: none; will-change: transform;
         }
-        
-        /* Capa de grosor/anchura */
+        .card-3d.active { cursor: grabbing; }
         .depth-layer { 
-            position: absolute; width: 100%; height: 100%; 
-            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2);
-            transform: translateZ(-30px); border-radius: 12px;
+            position: absolute; width: 100%; height: 100%; background: rgba(255,255,255,0.03); 
+            border: 1px solid rgba(255,255,255,0.1); transform: translateZ(-40px); border-radius: 12px; pointer-events: none;
         }
 
-        #c { background: transparent; cursor: grab; }
-        #c:active { cursor: grabbing; }
-
-        .controls { width: 350px; background: #fff; color: #333; padding: 25px; border-radius: 15px; }
-        .upload-btn { background: #6c63ff; color: white; padding: 12px; border-radius: 8px; border: none; cursor: pointer; width: 100%; margin-top: 10px; font-weight: bold; }
-        .btn-off { background: #e74c3c; }
-        .btn-download { background: #2ecc71; display: none; }
+        #c { background: transparent; border-radius: 12px; cursor: grab; }
+        
+        .controls { width: 350px; background: #fff; color: #333; padding: 20px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        h1 { margin: 0 0 15px 0; font-size: 20px; color: #6c63ff; }
+        .color-palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-bottom: 10px; }
+        .color-btn { border: none; height: 25px; cursor: pointer; border-radius: 3px; font-size: 10px; font-weight: bold; color: #fff; }
+        .upload-btn { background: #6c63ff; color: white; padding: 10px; border-radius: 6px; border: none; cursor: pointer; width: 100%; margin-top: 8px; font-weight: bold; }
+        #soundList { height: 80px; overflow-y: auto; border: 1px solid #ddd; padding: 5px; font-size: 11px; background: #f9f9f9; }
     </style>
 </head>
 <body>
@@ -61,13 +59,27 @@
     </div>
 
     <div class="controls">
-        <h1>MCTweaks.club</h1>
-        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">+ Subir Imagen de Fondo</button>
+        <h1>MCTweaks.club Editor</h1>
+        <label>Logo del Pack:</label>
+        <input type="file" id="logoInput" accept="image/*">
+        
+        <label>Versión:</label>
+        <select id="versionSelect" style="width:100%"><option value="48">1.21.4</option><option value="1">1.8.9</option></select>
+
+        <label>Descripción:</label>
+        <div class="color-palette" id="palette"></div>
+        <textarea id="descInput" rows="2" style="width:100%">§ePack de §aMCTweaks.club</textarea>
+
+        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">+ Subir Imagen Fondo</button>
         <input type="file" id="fileInput" accept="image/*" style="display:none">
         
+        <label>Mixer de Sonidos (.zip):</label>
+        <input type="file" id="soundInput" accept=".zip">
+        <div id="soundList"></div>
+
         <button id="readyBtn" class="upload-btn" style="background:#f39c12">Activar Modo 3D</button>
-        <button id="offBtn" class="upload-btn btn-off" style="display:none">Desactivar 3D</button>
-        <button id="downloadBtn" class="upload-btn btn-download">Descargar Texture Pack</button>
+        <button id="offBtn" class="upload-btn" style="background:#e74c3c; display:none">Desactivar 3D</button>
+        <button id="downloadBtn" class="upload-btn" style="background:#2ecc71">Descargar Texture Pack</button>
     </div>
 </div>
 
@@ -76,32 +88,36 @@
     const card3d = document.getElementById('card3d');
     let isDragging = false;
 
-    // Cargar Template
+    // 1. Cargar Template
     fabric.Image.fromURL('inventory.png', (img) => {
-        img.set({ selectable: false, originX: 'center', originY: 'center', left: 256, top: 256 });
+        img.set({ selectable: false, evented: false, originX: 'center', originY: 'center', left: 256, top: 256 });
         canvas.add(img);
     }, { crossOrigin: 'anonymous' });
 
-    // Lógica de Rotación Presionando Click
-    canvas.on('mouse:down', () => isDragging = true);
-    window.addEventListener('mouseup', () => {
-        isDragging = false;
-        card3d.style.transform = `rotateY(0deg) rotateX(0deg)`; // Reset al soltar
+    // 2. Colores y Sonidos
+    const colors = ['§0','§1','§2','§3','§4','§5','§6','§7','§8','§9','§a','§b','§c','§d','§e','§f'];
+    colors.forEach(c => {
+        const b = document.createElement('button');
+        b.className = 'color-btn'; b.style.backgroundColor = '#555'; b.innerText = c;
+        b.onclick = () => { document.getElementById('descInput').value += c; };
+        document.getElementById('palette').appendChild(b);
     });
 
+    // 3. Lógica 3D Sensible
+    canvas.on('mouse:down', () => { if(card3d.classList.contains('active')) isDragging = true; });
+    window.addEventListener('mouseup', () => { isDragging = false; });
     window.addEventListener('mousemove', (e) => {
-        if (!isDragging || !card3d.classList.contains('active')) return;
-        let x = (e.clientX / window.innerWidth - 0.5) * 60;
-        let y = (e.clientY / window.innerHeight - 0.5) * 60;
+        if (!isDragging) return;
+        let x = (e.clientX / window.innerWidth - 0.5) * 160;
+        let y = (e.clientY / window.innerHeight - 0.5) * 160;
         card3d.style.transform = `rotateY(${-x}deg) rotateX(${y}deg)`;
     });
 
-    // Botones de Estado
     document.getElementById('readyBtn').onclick = () => {
+        canvas.discardActiveObject(); canvas.renderAll(); // Limpia edición
         card3d.classList.add('active');
         document.getElementById('readyBtn').style.display = "none";
         document.getElementById('offBtn').style.display = "block";
-        document.getElementById('downloadBtn').style.display = "block";
     };
 
     document.getElementById('offBtn').onclick = () => {
@@ -111,7 +127,7 @@
         document.getElementById('offBtn').style.display = "none";
     };
 
-    // Subida y Descarga (Simplificada)
+    // 4. Subida y Descarga
     document.getElementById('fileInput').addEventListener('change', (e) => {
         const reader = new FileReader();
         reader.onload = (ev) => {
@@ -123,10 +139,13 @@
         reader.readAsDataURL(e.target.files[0]);
     });
 
-    document.getElementById('downloadBtn').onclick = async () => {
-        // Lógica de descarga igual a la anterior
-        alert("Generando y descargando...");
-    };
+    document.getElementById('downloadBtn').addEventListener('click', async () => {
+        const zip = new JSZip();
+        zip.folder("assets/minecraft/textures/gui/container").file("inventory.png", canvas.toDataURL().split(',')[1], {base64: true});
+        zip.file("pack.mcmeta", JSON.stringify({ pack: { pack_format: parseInt(document.getElementById('versionSelect').value), description: document.getElementById('descInput').value } }, null, 2));
+        const content = await zip.generateAsync({type: "blob"});
+        const link = document.createElement('a'); link.href = URL.createObjectURL(content); link.download = "MCTweaks_Pack.zip"; link.click();
+    });
 </script>
 </body>
 </html>
