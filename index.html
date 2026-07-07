@@ -24,14 +24,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #fff; padding: 20px; }
-        .app-wrapper { display: flex; gap: 40px; justify-content: center; align-items: start; flex-wrap: wrap; }
+        .app-wrapper { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; }
         .scene { width: 512px; height: 512px; perspective: 1200px; }
         .card-3d { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.05s linear; }
         .depth-layer { position: absolute; width: 100%; height: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); transform: translateZ(-40px); border-radius: 12px; opacity: 0; pointer-events: none; }
         .card-3d.active .depth-layer { opacity: 1; }
         #c { border-radius: 12px; cursor: grab; background: transparent; }
         .controls { width: 350px; background: #fff; color: #333; padding: 20px; border-radius: 15px; }
-        .color-btn { border: none; height: 25px; cursor: pointer; border-radius: 3px; font-weight: bold; color: #000; }
+        .color-btn { border: none; height: 25px; cursor: pointer; border-radius: 3px; font-weight: bold; color: #000; margin: 2px; }
         .upload-btn { background: #6c63ff; color: white; padding: 10px; border-radius: 6px; border: none; cursor: pointer; width: 100%; margin-top: 8px; }
     </style>
 </head>
@@ -48,18 +48,13 @@
     <div class="controls">
         <h1>MCTweaks.club</h1>
         <input type="text" id="packName" placeholder="Nombre del Pack" style="width:100%; margin-bottom:10px;">
-        <input type="file" id="logoInput" accept="image/*">
         <label>Descripción:</label>
-        <div id="palette" style="display:grid; grid-template-columns:repeat(8,1fr); gap:2px;"></div>
+        <div id="palette"></div>
         <textarea id="descInput" rows="2" style="width:100%">§ePack de §aMCTweaks.club</textarea>
         
         <button class="upload-btn" onclick="document.getElementById('fileInput').click()">+ Subir Imagen</button>
         <input type="file" id="fileInput" accept="image/*" style="display:none">
         
-        <label>Sonidos (.zip):</label>
-        <input type="file" id="soundInput" accept=".zip">
-        <div id="soundList" style="font-size:10px; height:60px; overflow:auto;"></div>
-
         <button id="readyBtn" class="upload-btn" style="background:#f39c12">Activar Modo 3D</button>
         <button id="offBtn" class="upload-btn" style="background:#e74c3c; display:none">Desactivar 3D</button>
         <button id="downloadBtn" class="upload-btn" style="background:#2ecc71">Generar .zip</button>
@@ -68,29 +63,43 @@
 
 <script>
     const canvas = new fabric.Canvas('c');
-    canvas.selection = false; // DESACTIVA EL CUADRO DE SELECCIÓN
+    canvas.selection = false;
     const card3d = document.getElementById('card3d');
     let isDragging = false;
+    let templateObj = null;
 
-    // Cargar Template
+    // 1. Cargar Template y fijarlo al frente
     fabric.Image.fromURL('inventory.png', (img) => {
-        img.set({ selectable: false, evented: false, originX: 'center', originY: 'center', left: 256, top: 256 });
-        canvas.add(img);
+        templateObj = img.set({ selectable: false, evented: false, originX: 'center', originY: 'center', left: 256, top: 256 });
+        canvas.add(templateObj);
+        templateObj.bringToFront();
     }, { crossOrigin: 'anonymous' });
 
-    // Botones Color (Letra A estilo Minecraft)
-    const colors = [
-        {c:'§0', b:'#000000'}, {c:'§1', b:'#0000AA'}, {c:'§2', b:'#00AA00'}, {c:'§3', b:'#00AAAA'},
-        {c:'§4', b:'#AA0000'}, {c:'§5', b:'#AA00AA'}, {c:'§6', b:'#FFAA00'}, {c:'§7', b:'#AAAAAA'}
-    ];
-    colors.forEach(col => {
+    // 2. Función maestra para añadir imagen correctamente
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            fabric.Image.fromURL(event.target.result, function(img) {
+                img.set({ originX: 'center', originY: 'center', left: 256, top: 256 });
+                canvas.add(img);
+                img.sendToBack(); // La imagen siempre va al fondo
+                if(templateObj) templateObj.bringToFront(); // El template siempre encima
+                canvas.renderAll();
+            });
+        };
+        reader.readAsDataURL(e.target.files[0]);
+    });
+
+    // Colores
+    const colors = ['§0','§1','§2','§3','§4','§5','§6','§7'];
+    colors.forEach(c => {
         const b = document.createElement('button');
-        b.className = 'color-btn'; b.style.backgroundColor = col.b; b.innerText = 'A';
-        b.onclick = () => { document.getElementById('descInput').value += col.c; };
+        b.className = 'color-btn'; b.innerText = 'A'; b.style.backgroundColor = '#ccc';
+        b.onclick = () => document.getElementById('descInput').value += c;
         document.getElementById('palette').appendChild(b);
     });
 
-    // 3D Logic
+    // 3D Logic Mejorada
     canvas.on('mouse:down', () => { if(card3d.classList.contains('active')) isDragging = true; });
     window.addEventListener('mouseup', () => isDragging = false);
     window.addEventListener('mousemove', (e) => {
@@ -116,19 +125,12 @@
         document.getElementById('offBtn').style.display = "none";
     };
 
-    // Zip y Descarga (Incluye todo)
     document.getElementById('downloadBtn').onclick = async () => {
         const zip = new JSZip();
-        // Exportación de canvas limpia
+        // Exportamos el canvas completo
         zip.folder("assets/minecraft/textures/gui/container").file("inventory.png", canvas.toDataURL().split(',')[1], {base64: true});
-        
-        // Incluir metadata
-        zip.file("pack.mcmeta", JSON.stringify({
-            pack: { pack_format: 48, description: document.getElementById('descInput').value }
-        }, null, 2));
-
         const content = await zip.generateAsync({type: "blob"});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(content); a.download = document.getElementById('packName').value || "MCTweaks.zip"; a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(content); a.download = "MCTweaks.zip"; a.click();
     };
 </script>
 </body>
